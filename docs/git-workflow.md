@@ -42,4 +42,4 @@ Use mensagens curtas no formato `feat:`, `fix:`, `docs:`, `refactor:` ou `chore:
 
 ## Estado inicial
 
-O [repositório público](https://github.com/matheusassuncaoo/melodycam) foi identificado em 23/11/2026 com um commit inicial na branch `main`, contendo a licença MIT. A criação da branch remota `develop`, regras de proteção e tags ocorre após o primeiro envio do código. Nenhum ambiente de deploy está configurado, portanto os prefixos de validação indicam marcos de código até existir uma esteira de publicação.
+O [repositório público](https://github.com/matheusassuncaoo/melodycam) foi identificado em 23/11/2026 com um commit inicial na branch `main`, contendo a licença MIT. `develop` e `feat/ambient-studio` já foram criadas no remoto. Regras de proteção e tags ainda dependem de uma primeira versão validada. Nenhum ambiente de deploy está configurado, portanto os prefixos de validação indicam marcos de código até existir uma esteira de publicação.
