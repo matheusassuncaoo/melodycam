@@ -184,7 +184,28 @@ const D = {
   "land.perk2": ["Sem conta", "No account"],
   "land.perk3": ["Seu vídeo não sai do navegador", "Your video never leaves the browser"],
   "land.perk4": ["Celular e computador", "Phone and computer"],
-  "land.demoAria": ["Animação: uma mão desliza por faixas coloridas e cada nota acende", "Animation: a hand slides across colored bands and each note lights up"],
+  "land.demoAria": ["Animação: uma mão faz a pinça e sobe pelas faixas de acordes G, B, C e Cm", "Animation: a hand pinches and moves up through the G, B, C and Cm chord bands"],
+  "land.hear": ["▶ Ouvir ao vivo", "▶ Hear it live"],
+  "land.mute": ["■ Silenciar", "■ Mute"],
+  "land.demoCaption": ["Pinça, depois sobe: G, B, C, Cm (no estilo de Creep). O som é o do próprio instrumento.", "Pinch, then move up: G, B, C, Cm (Creep style). The sound is the real instrument."],
+  "land.demoTitle": ["Veja o gesto e ouça o resultado", "See the gesture, hear the result"],
+  "land.privacyLink": ["Privacidade", "Privacy"],
+  "land.license": ["Licença MIT", "MIT license"],
+  "priv.title": ["Antes de ligar a câmera", "Before turning on the camera"],
+  "priv.lead": ["O Melodycam usa a câmera só para ver suas mãos. Veja o que acontece com os seus dados:", "Melodycam uses the camera only to see your hands. Here is what happens to your data:"],
+  "priv.p1t": ["Nada é gravado nem enviado", "Nothing is recorded or sent"],
+  "priv.p1p": ["O vídeo é processado no seu dispositivo, quadro a quadro, e descartado na hora. Nenhuma imagem, áudio ou dado das suas mãos sai do navegador ou é armazenado em servidor.", "The video is processed on your device, frame by frame, and discarded right away. No image, audio or hand data leaves your browser or is stored on any server."],
+  "priv.p2t": ["Sem cadastro, cookies ou rastreadores", "No sign-up, cookies or trackers"],
+  "priv.p2p": ["Não coletamos dados pessoais nem usamos análise de uso. As fontes e o modelo de detecção são servidos pelo próprio site.", "We collect no personal data and use no analytics. Fonts and the hand-tracking model are served by the site itself."],
+  "priv.p3t": ["O que fica no seu navegador", "What stays in your browser"],
+  "priv.p3p": ["Apenas o idioma, a calibração da pinça e este aceite, no armazenamento local do navegador. Para apagar, limpe os dados do site.", "Only your language, the pinch calibration and this consent, in your browser's local storage. To erase them, clear the site data."],
+  "priv.p4t": ["Você no controle", "You are in control"],
+  "priv.p4p": ["Pode desligar a câmera quando quiser pelo botão no topo. O código é aberto e pode ser auditado.", "You can stop the camera at any time with the button at the top. The code is open source and can be audited."],
+  "priv.law": ["Em linha com a LGPD (Lei 13.709/2018): a base é o seu consentimento, e como nenhum dado pessoal é armazenado, não há o que excluir ou transferir.", "In line with data-protection law (Brazil's LGPD): the basis is your consent, and since no personal data is stored there is nothing to delete or transfer."],
+  "priv.more": ["Política completa", "Full policy"],
+  "priv.accept": ["Aceitar e ligar a câmera", "Accept and turn on the camera"],
+  "priv.decline": ["Agora não", "Not now"],
+  "priv.aria": ["Aviso de privacidade", "Privacy notice"],
   "land.spectrumAria": ["As sete notas e suas cores", "The seven notes and their colors"],
   "land.s1eyebrow": ["01 A IDEIA", "01 THE IDEA"],
   "land.s1title": ["Luz é som. Cada nota tem a sua cor.", "Light is sound. Every note has its color."],
@@ -247,7 +268,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
   };
   useEffect(() => {
     document.documentElement.lang = lang === "pt" ? "pt-BR" : "en";
-    document.title = lang === "pt" ? "Melodycam · música nas suas mãos" : "Melodycam · music in your hands";
+    document.title = lang === "pt" ? "Melodycam: música nas suas mãos" : "Melodycam: music in your hands";
   }, [lang]);
   return <LangContext.Provider value={{ lang, setLang }}>{children}</LangContext.Provider>;
 }

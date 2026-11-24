@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { HandDemo } from "./HandDemo";
 import { LogoMark, Wordmark } from "./Logo";
 import { LangSwitch, t, useLang } from "./i18n";
 import { PRESETS } from "./music";
@@ -13,8 +14,6 @@ const GITHUB_PROFILE = "https://github.com/matheusassuncaoo";
 const GITHUB_REPO = "https://github.com/matheusassuncaoo/melodycam";
 
 const SPECTRUM = [60, 62, 64, 65, 67, 69, 71];
-const DEMO_NOTES = [60, 62, 64, 65, 67, 69, 71, 72];
-const DEMO_PATH = [0, 2, 4, 2, 5, 7, 4, 1];
 
 function scrollTo(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -75,21 +74,7 @@ export function Landing() {
         });
         gsap.to(".spectrum", { backgroundPosition: "200% 0", duration: 8, repeat: -1, ease: "none" });
 
-        // Demo viva: o anel passeia pelas faixas e cada nota acende
-        const label = rootRef.current?.querySelector<HTMLElement>(".demo-note");
-        const demo = gsap.timeline({ repeat: -1, repeatDelay: 0.4, scrollTrigger: { trigger: ".demo", start: "top 90%", toggleActions: "play pause resume pause" } });
-        DEMO_PATH.forEach((zone, step) => {
-          demo.to(".demo-ring", { left: `${(zone + 0.5) * 12.5}%`, top: `${30 + Math.sin(step * 1.7) * 18}%`, duration: 0.7, ease: "power2.inOut" })
-            .to(".demo-ring", { scale: 0.6, duration: 0.12, ease: "power2.in" }, ">-0.05")
-            .call(() => { if (label) { label.textContent = solfege(DEMO_NOTES[zone]); label.style.color = noteColor(DEMO_NOTES[zone]); } })
-            .fromTo(`.demo-zone:nth-child(${zone + 1})`, { opacity: 0.45 }, { opacity: 1, duration: 0.25, yoyo: true, repeat: 1 }, "<")
-            .to(".demo-ring", { scale: 1, duration: 0.3, ease: "elastic.out(1, 0.5)" }, ">0.15")
-            .to({}, { duration: 0.25 });
-        });
-        gsap.utils.toArray<HTMLElement>(".eq i").forEach((bar, index) => {
-          gsap.fromTo(bar, { scaleY: 0.15 }, { scaleY: () => gsap.utils.random(0.35, 1), duration: gsap.utils.random(0.35, 0.8), repeat: -1, yoyo: true, ease: "sine.inOut", delay: index * 0.03 });
-        });
-        gsap.from(".demo", { opacity: 0, y: 60, scale: 0.96, duration: 1, ease: "power3.out", scrollTrigger: { trigger: ".demo", start: "top 88%" } });
+        gsap.from(".hand-demo", { opacity: 0, y: 60, scale: 0.96, duration: 1, ease: "power3.out", scrollTrigger: { trigger: ".hand-demo", start: "top 88%" } });
 
         // Revelação ao rolar
         gsap.utils.toArray<HTMLElement>(".reveal").forEach((element) => {
@@ -163,15 +148,8 @@ export function Landing() {
       </div>
     </section>
 
-    <section className="demo-section" aria-label="Demo">
-      <div className="demo glass" role="img" aria-label={t("land.demoAria")}>
-        <div className="demo-zones">
-          {DEMO_NOTES.map((midi) => <div key={midi} className="demo-zone" style={{ "--note": noteColor(midi) } as React.CSSProperties}><span>{solfege(midi)}</span></div>)}
-          <div className="demo-ring" />
-        </div>
-        <div className="demo-readout"><span>{t("land.note")}</span><b className="demo-note">{solfege(60)}</b></div>
-        <div className="eq" aria-hidden="true">{Array.from({ length: 36 }, (_, index) => <i key={index} style={{ background: noteColor(60 + (index % 8)) }} />)}</div>
-      </div>
+    <section className="demo-section" aria-label={t("land.demoTitle")}>
+      <HandDemo />
     </section>
 
     <section id="ideia" className="landing-section">
@@ -203,12 +181,13 @@ export function Landing() {
         <LogoMark size={40} />
         <div>
           <strong>{t("land.by")}</strong>
-          <span>{t("land.openSource")}</span>
+          <span>{t("land.openSource")} {t("land.license")}</span>
         </div>
       </div>
       <div className="footer-links">
         <a className="btn ghost" href={GITHUB_PROFILE} target="_blank" rel="noreferrer">{t("land.github")}</a>
         <a className="btn ghost" href={GITHUB_REPO} target="_blank" rel="noreferrer">{t("land.repo")}</a>
+        <a className="btn ghost" href={`${GITHUB_REPO}/blob/main/PRIVACY.md`} target="_blank" rel="noreferrer">{t("land.privacyLink")}</a>
         <a className="btn primary" href="#/">{t("land.open")}</a>
       </div>
     </footer>

@@ -3,7 +3,6 @@
  * Princípio: luz é som. As 7 notas viram 7 cores do espectro e a mesma cor segue a nota
  * em toda a interface (teclado, faixas, acordes, mãos, onda). Veja docs/design-system.md.
  */
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700;800&display=swap');
 
 :root {
   /* Tinta: fundos em camadas, do mais profundo ao mais elevado */
@@ -42,8 +41,8 @@
   --record: #ff7a93;
 
   /* Tipografia */
-  --font-display: 'Unbounded', 'Manrope', system-ui, sans-serif;
-  --font-ui: 'Manrope', system-ui, sans-serif;
+  --font-display: 'Unbounded Variable', 'Manrope Variable', system-ui, sans-serif;
+  --font-ui: 'Manrope Variable', system-ui, sans-serif;
 
   /* Espaço (base 4px), raios, elevação */
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px;

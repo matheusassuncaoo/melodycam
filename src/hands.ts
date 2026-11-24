@@ -126,7 +126,7 @@ export function drawOverlay(
         ctx.fillRect(x + 2, top, bandW - 4, bottom - top);
         ctx.fillStyle = color + (active ? "ff" : "99");
         ctx.fillRect(x + 2, top, bandW - 4, active ? 4 : 2);
-        ctx.font = `${active ? 700 : 600} ${Math.min(18, bandW * 0.3)}px Manrope, system-ui, sans-serif`;
+        ctx.font = `${active ? 700 : 600} ${Math.min(18, bandW * 0.3)}px "Manrope Variable", system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.fillText(zones.labels[i], x + bandW / 2, top + 24);
         mark(x, top, bandW, bottom - top, i);
@@ -148,7 +148,7 @@ export function drawOverlay(
         ctx.fillRect(left, y + 2, right - left, bandH - 4);
         ctx.fillStyle = color + (active ? "ff" : "99");
         ctx.fillRect(left, y + 2, active ? 6 : 3, bandH - 4);
-        ctx.font = `${active ? 800 : 600} ${Math.max(11, Math.min(20, bandH * 0.5))}px Manrope, system-ui, sans-serif`;
+        ctx.font = `${active ? 800 : 600} ${Math.max(11, Math.min(20, bandH * 0.5))}px "Manrope Variable", system-ui, sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         ctx.fillStyle = active ? "#ffffff" : color;
@@ -183,7 +183,7 @@ export function drawOverlay(
 
     if (hand.badge) {
       const wrist = px[0];
-      ctx.font = "800 30px Unbounded, Manrope, system-ui, sans-serif";
+      ctx.font = '800 30px "Unbounded Variable", "Manrope Variable", system-ui, sans-serif';
       ctx.textAlign = "center";
       ctx.fillStyle = "#0b0a14cc";
       ctx.beginPath();

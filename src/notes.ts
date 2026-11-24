@@ -24,6 +24,14 @@ function mix(a: string, b: string): string {
   return `#${hex((r1 + r2) / 2)}${hex((g1 + g2) / 2)}${hex((b1 + b2) / 2)}`;
 }
 
+/** Clareia (amount > 0) ou escurece (amount < 0) uma cor #rrggbb. */
+export function shade(color: string, amount: number): string {
+  const target = amount < 0 ? 0 : 255;
+  const weight = Math.min(1, Math.abs(amount));
+  const channel = (offset: number) => Math.round(parseInt(color.slice(offset, offset + 2), 16) * (1 - weight) + target * weight).toString(16).padStart(2, "0");
+  return `#${channel(1)}${channel(3)}${channel(5)}`;
+}
+
 export function noteColor(midi: number): string {
   const pitchClass = ((midi % 12) + 12) % 12;
   const natural = NATURAL_COLORS[pitchClass];
@@ -62,6 +70,8 @@ export type Chord = { symbol: string; root: string; accidental: string; quality:
 const ROOTS: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 const ROOT_NAMES: Record<string, string> = { C: "Dó", D: "Ré", E: "Mi", F: "Fá", G: "Sol", A: "Lá", B: "Si" };
 const QUALITY_PT: Record<Quality, string> = { "": "maior", m: "menor", dim: "diminuto", maj7: "maior com sétima", m7: "menor com sétima" };
+/** Menores escurecem, diminutos mais ainda, sétima maior clareia: a cor da nota raiz muda com a qualidade. */
+const QUALITY_SHADE: Record<Quality, number> = { "": 0, m: -0.45, dim: -0.62, maj7: 0.14, m7: -0.36 };
 const QUALITY_EN: Record<Quality, string> = { "": "major", m: "minor", dim: "diminished", maj7: "major 7th", m7: "minor 7th" };
 
 /** Monta um acorde em pad largo e grave (raiz, oitava, terça e quinta abertas), pensado para ambient. */
@@ -80,7 +90,7 @@ export function makeChord(symbol: string, fingers: number): Chord {
     notes: seventh
       ? [low, low + 12, low + 12 + third, low + 12 + fifth, low + 12 + seventh]
       : [low, low + 12, low + 12 + third, low + 12 + fifth, low + 24 + third],
-    color: noteColor(pitchClass)
+    color: shade(noteColor(pitchClass), QUALITY_SHADE[quality])
   };
 }
 

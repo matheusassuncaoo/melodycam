@@ -10,12 +10,16 @@ import { Keyboard } from "./Keyboard";
 import { LogoMark, Wordmark } from "./Logo";
 import { Landing } from "./Landing";
 import { LangProvider, LangSwitch, t, tr, useLang, type Key } from "./i18n";
+import "@fontsource-variable/manrope";
+import "@fontsource-variable/unbounded";
 import "./tokens.css";
 import "./style.css";
 
 const BPM = 100;
 const KEY_ROW = ["a", "s", "d", "f", "g", "h", "j", "k"];
 const PINCH_STORAGE = "melodycam-pinch";
+const CONSENT_STORAGE = "melodycam-consent";
+const PRIVACY_URL = "https://github.com/matheusassuncaoo/melodycam/blob/main/PRIVACY.md";
 
 /** Faixas laterais (notas em "Lados"): no desktop evitam os painéis; no celular usam a largura toda. */
 const zoneRange = () => window.innerWidth > 900 ? { min: 0.19, max: 0.81 } : { min: 0.06, max: 0.94 };
@@ -65,6 +69,32 @@ function Seg<T extends string>({ value, options, onChange, label }: { value: T; 
   </div>;
 }
 
+const PRIVACY_POINTS: [Key, Key][] = [["priv.p1t", "priv.p1p"], ["priv.p2t", "priv.p2p"], ["priv.p3t", "priv.p3p"], ["priv.p4t", "priv.p4p"]];
+
+/** Aviso de privacidade (LGPD) mostrado antes da primeira vez que a câmera é ligada. */
+function PrivacyModal({ onAccept, onClose }: { onAccept: () => void; onClose: () => void }) {
+  const acceptRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    acceptRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return <div className="guide-backdrop" onClick={onClose}>
+    <div className="guide glass privacy" role="dialog" aria-modal="true" aria-label={t("priv.aria")} onClick={(event) => event.stopPropagation()}>
+      <div className="guide-head"><span className="eyebrow">{t("priv.aria").toUpperCase()}</span><button type="button" onClick={onClose} aria-label={t("guide.close")}>×</button></div>
+      <h2>{t("priv.title")}</h2>
+      <p className="privacy-lead">{t("priv.lead")}</p>
+      <ul className="privacy-list">{PRIVACY_POINTS.map(([title, text]) => <li key={title}><strong>{t(title)}</strong><p>{t(text)}</p></li>)}</ul>
+      <p className="privacy-law">{t("priv.law")} <a href={PRIVACY_URL} target="_blank" rel="noreferrer">{t("priv.more")}</a></p>
+      <div className="guide-footer privacy-actions">
+        <button type="button" className="btn ghost" onClick={onClose}>{t("priv.decline")}</button>
+        <button type="button" ref={acceptRef} className="btn primary" onClick={onAccept}>{t("priv.accept")}</button>
+      </div>
+    </div>
+  </div>;
+}
+
 function App() {
   const { lang } = useLang();
   const [mode, setMode] = useState<Mode>("chords");
@@ -101,6 +131,7 @@ function App() {
   const [panelsHidden, setPanelsHidden] = useState(false);
   const [glide, setGlide] = useState(0.5);
   const [calib, setCalib] = useState<Calib>(null);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -649,6 +680,18 @@ function App() {
     } finally { setLoading(false); }
   };
 
+  /** Liga a câmera depois do aceite de privacidade (guardado no navegador). */
+  const requestCamera = () => {
+    let accepted = false;
+    try { accepted = localStorage.getItem(CONSENT_STORAGE) === "1"; } catch { /* sem armazenamento */ }
+    if (accepted) void startCamera(); else setPrivacyOpen(true);
+  };
+  const acceptPrivacy = () => {
+    try { localStorage.setItem(CONSENT_STORAGE, "1"); } catch { /* ignorado */ }
+    setPrivacyOpen(false);
+    void startCamera();
+  };
+
   const stopDemo = useCallback(() => {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
@@ -788,7 +831,7 @@ function App() {
         <button type="button" className="btn ghost" onClick={() => setGuideOpen((value) => !value)} aria-expanded={guideOpen}>{t("head.guide")}</button>
         {cameraOn && <button type="button" className="btn ghost" onClick={() => setSwapHands((value) => !value)}>{swapHands ? t("head.swapped") : t("head.swap")}</button>}
         {cameraOn && <button type="button" className="btn ghost desktop-only" onClick={() => setPanelsHidden((value) => !value)}>{panelsHidden ? t("head.showPanels") : t("head.hidePanels")}</button>}
-        <button type="button" className="btn primary" onClick={cameraOn ? stopCamera : startCamera} disabled={loading}>{loading ? t("head.preparing") : cameraOn ? t("head.stop") : t("head.start")}</button>
+        <button type="button" className="btn primary" onClick={cameraOn ? stopCamera : requestCamera} disabled={loading}>{loading ? t("head.preparing") : cameraOn ? t("head.stop") : t("head.start")}</button>
       </div>
     </header>
 
@@ -831,7 +874,7 @@ function App() {
           <LogoMark size={72} />
           <h1>{t("stage.h1a")}<span>{t("stage.h1b")}</span></h1>
           <p>{t("stage.p")}</p>
-          <button type="button" className="btn primary large" onClick={startCamera} disabled={loading}>{loading ? t("head.preparing") : t("head.start")}</button>
+          <button type="button" className="btn primary large" onClick={requestCamera} disabled={loading}>{loading ? t("head.preparing") : t("head.start")}</button>
           <small>{t("stage.small")}</small>
         </div>}
         <div className={`now ${cameraOn ? "compact" : ""} ${playing ? "sounding" : ""}`} style={{ "--note": nowColor } as React.CSSProperties}>
@@ -895,6 +938,7 @@ function App() {
       </div>
       <div className="guide-footer"><span>{t("guide.foot")}</span><button type="button" className="btn primary" onClick={() => setGuideOpen(false)}>{t("guide.ok")}</button></div>
     </div></div>}
+    {privacyOpen && <PrivacyModal onAccept={acceptPrivacy} onClose={() => setPrivacyOpen(false)} />}
     {message && <div className="toast glass" role="alert"><span>{message}</span><button type="button" onClick={() => setMessage("")} aria-label={t("toast.close")}>×</button></div>}
   </div>;
 }

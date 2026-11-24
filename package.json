@@ -2,6 +2,28 @@
   "name": "melodycam",
   "private": true,
   "version": "0.1.0",
+  "description": "Play ambient chords and melodies in the air with your hands, in the browser. Toque ambient com as mãos, direto no navegador.",
+  "license": "MIT",
+  "author": "Matheus Assunção da Cunha (https://github.com/matheusassuncaoo)",
+  "homepage": "https://matheusassuncaoo.github.io/melodycam/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matheusassuncaoo/melodycam.git"
+  },
+  "bugs": {
+    "url": "https://github.com/matheusassuncaoo/melodycam/issues"
+  },
+  "keywords": [
+    "music",
+    "gestures",
+    "hand-tracking",
+    "mediapipe",
+    "web-audio",
+    "ambient",
+    "synthesizer",
+    "react",
+    "typescript"
+  ],
   "type": "module",
   "scripts": {
     "predev": "node scripts/copy-mediapipe.mjs",
@@ -11,6 +33,8 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@fontsource-variable/unbounded": "^5.3.0",
     "@mediapipe/tasks-vision": "^0.10.22",
     "gsap": "^3.15.1",
     "react": "^19.2.0",

@@ -8,6 +8,21 @@ Projeto open source para criar e tocar melodias com gestos diante da câmera.
 
 Transformar movimentos das mãos em notas e acordes, com resposta sonora imediata e feedback visual. A interface funciona como um instrumento em tela cheia: câmera ao fundo, mapa de gestos, osciloscópio e controles de som em painéis translúcidos. Deve funcionar sem conta e sem enviar o vídeo da câmera a um servidor.
 
+## English
+
+**Melodycam** lets you play ambient chords and melodies in the air with your hands, right in your browser. Show your hands to the camera, pinch thumb and index to make a sound, and move your hand up or down to change chords, like reading a score. It works with one hand, on desktop and phone, in English and Portuguese.
+
+- **Chords (ambient):** progressions like Creep, Careless Whisper style and a full C major field, with dark ambient, synthwave and dreamscape pads. Chords glide into each other with no re-attack.
+- **Notes:** C D E F G A B C across the screen, sideways or up and down.
+- **Songs:** a library of public-domain and original melodies, played one pinch per note or as a score.
+- **Private by design:** video is processed locally and never stored or sent. See [PRIVACY.md](PRIVACY.md).
+- **Open source:** [MIT](LICENSE). See [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+```sh
+npm install
+npm run dev
+```
+
 ## Documentação
 
 - [Design system "Spectrum"](docs/design-system.md): logo, cores por nota, tipografia e componentes.
@@ -44,6 +59,10 @@ Validar o instrumento com pessoas usuárias, especialmente confiabilidade dos ge
 ## Página sobre o projeto
 
 Clicar na logo abre a página de apresentação (`#/sobre`), com a ideia e a seção de engine. Funciona também em celular.
+
+## Privacidade e licenças
+
+O vídeo da câmera é processado no seu dispositivo e nunca é gravado nem enviado. Um aviso de privacidade (LGPD) aparece antes da primeira ativação. Detalhes em [PRIVACY.md](PRIVACY.md). Licença [MIT](LICENSE); veja também [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) e [SECURITY.md](SECURITY.md).
 
 ## Idiomas
 
