@@ -4,16 +4,17 @@ import type { HandLandmarker, NormalizedLandmark } from "@mediapipe/tasks-vision
 import { PRESETS, Synth, validateProject, type Project, type RecordedEvent } from "./music";
 import { PROGRESSIONS, MAJOR_SCALE, OCTAVES, noteColor, noteLabel, solfege } from "./notes";
 import { SONGS, songRange } from "./songs";
-import { PinchDetector, VoteFilter, ZoneSelector, pinchRatio, readFingers, type Point } from "./gestures";
+import { Ema, PinchDetector, VoteFilter, ZoneSelector, pinchRatio, readFingers, type Point } from "./gestures";
 import { ROLE_COLORS, createHandLandmarker, drawOverlay, frameToScreen, type DrawHand } from "./hands";
 import { Keyboard } from "./Keyboard";
 import { LogoMark, Wordmark } from "./Logo";
+import { Landing } from "./Landing";
 import "./tokens.css";
 import "./style.css";
 
 const BPM = 100;
-const ZONE_MIN = 0.22;
-const ZONE_MAX = 0.94;
+/** Faixas de toque: no desktop evitam os painéis laterais; no celular usam a largura toda. */
+const zoneRange = () => window.innerWidth > 900 ? { min: 0.19, max: 0.81 } : { min: 0.06, max: 0.94 };
 const KEY_ROW = ["a", "s", "d", "f", "g", "h", "j", "k"];
 
 type Mode = "chords" | "notes" | "song";
@@ -74,7 +75,7 @@ function App() {
   const [presetIndex, setPresetIndex] = useState(0);
   const [echo, setEcho] = useState(PRESETS[0].echo);
   const [space, setSpace] = useState(PRESETS[0].space);
-  const [sensitivity, setSensitivity] = useState(0.55);
+  const [sensitivity, setSensitivity] = useState(0.6);
   const [fps, setFps] = useState(0);
   const [engine, setEngine] = useState("");
   const [fingers, setFingers] = useState(0);
@@ -91,7 +92,13 @@ function App() {
   const synthRef = useRef(new Synth());
   const fingerVoteRef = useRef(new VoteFilter(6, 4));
   const pinchDetectorRef = useRef(new PinchDetector());
-  const zoneSelectorRef = useRef(new ZoneSelector(8, ZONE_MIN, ZONE_MAX));
+  const zoneSelectorRef = useRef(new ZoneSelector(8, 0.19, 0.81));
+  const chordZoneRef = useRef(new ZoneSelector(8, 0.19, 0.81));
+  const pinchEmaRef = useRef(new Ema(0.55));
+  const workRef = useRef<HTMLCanvasElement | null>(null);
+  const probeRef = useRef<HTMLCanvasElement | null>(null);
+  const boostRef = useRef(1);
+  const frameCountRef = useRef(0);
   const modeRef = useRef<Mode>("chords");
   const chordRef = useRef(0);
   const progRef = useRef(0);
@@ -132,7 +139,7 @@ function App() {
     setMode(next);
     pinchRef.current = false;
     synthRef.current.setBrightness(0.4333);
-    const padPreset = presetIndex <= 1;
+    const padPreset = presetIndex <= 3;
     if (next === "chords" && !padPreset) choosePreset(0);
     if (next !== "chords" && padPreset) choosePreset(PRESETS.findIndex((item) => item.id === "piano"));
     setStatus(next === "chords" ? "Mão esquerda escolhe, direita toca" : next === "notes" ? "Deslize a mão e junte os dedos" : "Junte os dedos para tocar a próxima nota");
@@ -151,6 +158,7 @@ function App() {
     stopSound();
     progRef.current = index;
     chordRef.current = 0;
+    chordZoneRef.current = new ZoneSelector(PROGRESSIONS[index].chords.length, 0.19, 0.81);
     setProgIndex(index);
     setChord(0);
   };
@@ -280,6 +288,37 @@ function App() {
     startSound("manual", advances ? undefined : { notes: [midi], label: noteLabel(midi), type: "note" });
   }, [startSound]);
 
+  /** Desenha o quadro numa tela menor com brilho adaptativo: em ambiente escuro a detecção enxerga mais, e a prévia também fica clara. */
+  const prepareFrame = (video: HTMLVideoElement): HTMLVideoElement | HTMLCanvasElement => {
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return video;
+    const work = workRef.current ?? (workRef.current = document.createElement("canvas"));
+    const w = Math.min(640, vw);
+    const h = Math.round(w * vh / vw);
+    if (work.width !== w || work.height !== h) { work.width = w; work.height = h; }
+    const context = work.getContext("2d");
+    if (!context) return video;
+    if (frameCountRef.current++ % 20 === 0) {
+      const probe = probeRef.current ?? (probeRef.current = document.createElement("canvas"));
+      probe.width = 32; probe.height = 18;
+      const probeContext = probe.getContext("2d", { willReadFrequently: true });
+      if (probeContext) {
+        probeContext.drawImage(video, 0, 0, 32, 18);
+        const data = probeContext.getImageData(0, 0, 32, 18).data;
+        let total = 0;
+        for (let i = 0; i < data.length; i += 4) total += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        const luminance = total / (data.length / 4) / 255;
+        const target = Math.max(1, Math.min(2.6, 0.42 / Math.max(luminance, 0.03)));
+        boostRef.current += (target - boostRef.current) * 0.5;
+        video.style.filter = `brightness(${boostRef.current.toFixed(2)}) contrast(1.08)`;
+      }
+    }
+    context.filter = `brightness(${boostRef.current.toFixed(2)}) contrast(1.1)`;
+    context.drawImage(video, 0, 0, w, h);
+    return work;
+  };
+
   const processFrame = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -290,7 +329,7 @@ function App() {
     if (stamp <= lastStampRef.current) stamp = lastStampRef.current + 1;
     lastStampRef.current = stamp;
 
-    const result = landmarker.detectForVideo(video, stamp);
+    const result = landmarker.detectForVideo(prepareFrame(video), stamp);
     const counter = fpsCountRef.current;
     counter.frames++;
     if (stamp - counter.since >= 1000) { setFps(Math.round(counter.frames * 1000 / (stamp - counter.since))); counter.frames = 0; counter.since = stamp; }
@@ -308,6 +347,10 @@ function App() {
     setHandsDetected((previous) => previous === hands.length ? previous : hands.length);
 
     const currentMode = modeRef.current;
+    const prog = PROGRESSIONS[progRef.current];
+    const chordZones = currentMode === "chords" && prog.select === "zones";
+    const slide = currentMode !== "chords" || chordZones;
+    const range = zoneRange();
     const sorted = [...hands].sort((a, b) => a.sx - b.sx);
     const swap = swapRef.current;
     let selector: FrameHand | undefined;
@@ -316,7 +359,7 @@ function App() {
       selector = swap ? sorted[1] : sorted[0];
       player = swap ? sorted[0] : sorted[1];
     } else if (hands.length === 1) {
-      if (currentMode === "chords") {
+      if (!slide) {
         const onLeft = sorted[0].sx < 0.5;
         if (onLeft !== swap) selector = sorted[0]; else player = sorted[0];
       } else player = sorted[0];
@@ -328,24 +371,29 @@ function App() {
       const stable = fingerVoteRef.current.update(count);
       selectorBadge = String(stable);
       setFingers((previous) => previous === stable ? previous : stable);
-      if (currentMode === "chords" && stable >= 1 && stable <= PROGRESSIONS[progRef.current].chords.length && stable - 1 !== chordRef.current) pickChord(stable - 1);
+      if (currentMode === "chords" && !chordZones && stable >= 1 && stable <= prog.chords.length && stable - 1 !== chordRef.current) pickChord(stable - 1);
       if (currentMode === "notes" && stable >= 1 && stable <= OCTAVES.length && stable - 1 !== octaveRef.current) pickOctave(stable - 1);
     }
 
     let pinching = false;
     if (player) {
       missingRef.current = 0;
-      const ratio = pinchRatio(player.world);
+      const ratio = pinchEmaRef.current.update(pinchRatio(player.world));
       pinching = pinchDetectorRef.current.update(ratio);
       const meter = Math.round(Math.max(0, Math.min(1, 1 - ratio / 0.9)) * 20) * 5;
       setPinch((previous) => previous === meter ? previous : meter);
       if (currentMode === "chords") synthRef.current.setBrightness(1 - player.pinchAt.y);
+      if (chordZones) {
+        const index = chordZoneRef.current.update(player.pinchAt.x, range.min, range.max);
+        if (index !== chordRef.current) pickChord(index);
+      }
       if (currentMode === "notes") {
-        const next = zoneSelectorRef.current.update(player.pinchAt.x);
+        const next = zoneSelectorRef.current.update(player.pinchAt.x, range.min, range.max);
         if (next !== zoneRef.current) { zoneRef.current = next; setZone(next); }
       }
     } else {
       pinchDetectorRef.current.reset();
+      pinchEmaRef.current.reset();
       missingRef.current++;
     }
 
@@ -355,24 +403,27 @@ function App() {
     pinchRef.current = pinching;
     if (!player && playingRef.current && missingRef.current > 4) stopSound();
 
-    const zoneColor = noteColor(OCTAVES[octaveRef.current].base + MAJOR_SCALE[zoneRef.current]);
+    const base = OCTAVES[octaveRef.current].base;
+    const playColor = currentMode === "notes" ? noteColor(base + MAJOR_SCALE[zoneRef.current]) : chordZones ? prog.chords[chordRef.current]?.color : undefined;
     const draw: DrawHand[] = hands.map((hand) => {
       const role = hand === selector ? "select" : hand === player ? "play" : "idle";
       return {
         points: hand.points, role,
         badge: role === "select" ? selectorBadge : undefined,
         pinchActive: role === "play" && pinching, pinchAt: hand.pinchAt,
-        color: role === "play" && currentMode === "notes" ? zoneColor : ROLE_COLORS[role]
+        color: role === "play" && playColor ? playColor : ROLE_COLORS[role]
       };
     });
-    drawOverlay(canvas, video, draw, currentMode === "notes" ? {
-      count: 8, min: ZONE_MIN, max: ZONE_MAX, active: zoneRef.current,
-      midis: MAJOR_SCALE.map((step) => OCTAVES[octaveRef.current].base + step),
-      labels: MAJOR_SCALE.map((step) => solfege(OCTAVES[octaveRef.current].base + step))
-    } : null);
+    const overlay = currentMode === "notes"
+      ? { count: 8, min: range.min, max: range.max, active: zoneRef.current, colors: MAJOR_SCALE.map((step) => noteColor(base + step)), labels: MAJOR_SCALE.map((step) => solfege(base + step)) }
+      : chordZones
+        ? { count: prog.chords.length, min: range.min, max: range.max, active: chordRef.current, colors: prog.chords.map((item) => item.color), labels: prog.chords.map((item) => item.symbol) }
+        : null;
+    drawOverlay(canvas, video, draw, overlay);
 
-    if (hands.length === 0) setStatus("Não vejo mãos: mostre-as à câmera, com boa luz");
+    if (hands.length === 0) setStatus("Não vejo mãos: mostre-as à câmera e acenda uma luz");
     else if (!player) setStatus("Mostre a mão que toca (à direita da tela)");
+    else if (chordZones) setStatus(pinching ? "Tocando" : "Deslize pelas faixas e junte os dedos");
     else if (currentMode === "chords" && !selector) setStatus("Mostre a mão que escolhe o acorde (à esquerda)");
     else setStatus(pinching ? "Tocando" : currentMode === "song" ? "Junte polegar e indicador" : "Pronto: junte polegar e indicador");
   }, [startSound, stopSound]);
@@ -405,6 +456,9 @@ function App() {
     const canvas = canvasRef.current;
     canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
     fingerVoteRef.current.reset();
+    pinchEmaRef.current.reset();
+    boostRef.current = 1;
+    if (video) video.style.filter = "";
     pinchDetectorRef.current.reset();
     zoneSelectorRef.current.reset();
     pinchRef.current = false;
@@ -566,21 +620,23 @@ function App() {
   const nowColor = mode === "chords" ? chords[chord].color : noteColor(focusMidi);
   const nowCaption = mode === "chords" ? "ACORDE" : mode === "notes" ? "NOTA" : "PRÓXIMA NOTA";
   const nowText = mode === "chords" ? chords[chord].symbol : solfege(focusMidi);
-  const nowName = mode === "chords" ? chords[chord].name : mode === "notes" ? `${OCTAVES[octave].name} · ${noteLabel(focusMidi)}` : song.title;
+  const nowName = mode === "chords" ? chords[chord].name : mode === "notes" ? `Oitava ${OCTAVES[octave].name.toLowerCase()}, ${noteLabel(focusMidi)}` : song.title;
   const ribbon = mode === "song" ? Array.from({ length: 8 }, (_, i) => ({ index: songPos + i, note: song.notes[(songPos + i) % song.notes.length], wrap: songPos + i >= song.notes.length })) : [];
 
-  return <div className="studio">
+  const chordZonesUi = PROGRESSIONS[progIndex].select === "zones";
+  return <div className={`studio ${cameraOn ? "cam-on" : ""}`}>
     <video ref={videoRef} className={`camera-video ${cameraOn ? "is-visible" : ""}`} playsInline muted autoPlay aria-label="Prévia da câmera" />
     <div className="camera-vignette" aria-hidden="true" />
     <canvas ref={canvasRef} className="hand-overlay" aria-hidden="true" />
     <div className="atmosphere" aria-hidden="true"><div className="aura aura-one" /><div className="aura aura-two" /></div>
 
     <header className="studio-header glass">
-      <Wordmark />
+      <Wordmark href="#/sobre" />
       <div className="header-status">
         <span className={`signal ${cameraOn && handsDetected > 0 ? "live" : ""}`} />
         <span>{cameraOn ? `${handsDetected} ${handsDetected === 1 ? "mão" : "mãos"}` : "Câmera desligada"}</span>
-        {cameraOn && <span className="chip">{fps} fps · {engine}</span>}
+        {cameraOn && <span className="chip">{fps} fps</span>}
+        {cameraOn && <span className="chip">{engine}</span>}
       </div>
       <div className="header-actions">
         <button type="button" className="btn ghost" onClick={() => setGuideOpen((value) => !value)} aria-expanded={guideOpen}>Como tocar</button>
@@ -599,23 +655,25 @@ function App() {
         {mode === "chords" && <>
           <div className="panel-heading"><span className="eyebrow">PROGRESSÃO</span><h2>Escolha a música</h2></div>
           <div className="prog-grid">{PROGRESSIONS.map((item, index) => <button key={item.id} type="button" className={progIndex === index ? "selected" : ""} onClick={() => pickProgression(index)} aria-pressed={progIndex === index}><strong>{item.title}</strong><small>{item.subtitle}</small></button>)}</div>
-          <div className="panel-heading"><span className="eyebrow">MÃO ESQUERDA</span><h2>Mostre de 1 a {chords.length} dedos</h2><p>Segure a pinça com a direita: o pad sustenta e o acorde muda ao vivo. Subir a mão abre o brilho.</p></div>
-          <div className="chord-list">{chords.map((item, index) => <button key={item.symbol} type="button" className={`chord-button ${chord === index ? "selected" : ""}`} style={{ "--note": item.color } as React.CSSProperties} onClick={() => pickChord(index)} aria-pressed={chord === index}>
-            <span className="finger-count">{item.fingers}</span><span className="chord-symbol">{item.symbol}</span><span className="chord-name">{item.name}</span>
+          {chordZonesUi
+            ? <div className="panel-heading"><span className="eyebrow">MÃO DIREITA</span><h2>Deslize pelos {chords.length} acordes</h2><p>A tela se divide em faixas, uma por acorde. Junte os dedos para o pad soar e deslize para trocar ao vivo. Subir a mão abre o brilho.</p></div>
+            : <div className="panel-heading"><span className="eyebrow">MÃO ESQUERDA</span><h2>Mostre de 1 a {chords.length} dedos</h2><p>Segure a pinça com a direita: o pad sustenta e o acorde muda ao vivo. Subir a mão abre o brilho.</p></div>}
+          <div className={`chord-list ${chords.length > 5 ? "wide" : ""}`}>{chords.map((item, index) => <button key={`${item.symbol}-${index}`} type="button" className={`chord-button ${chord === index ? "selected" : ""}`} style={{ "--note": item.color } as React.CSSProperties} onClick={() => pickChord(index)} aria-pressed={chord === index}>
+            <span className="finger-count">{index + 1}</span><span className="chord-symbol">{item.symbol}</span><span className="chord-name">{item.name}</span>
           </button>)}</div>
         </>}
 
         {mode === "notes" && <>
           <div className="panel-heading"><span className="eyebrow">MÃO DIREITA</span><h2>Deslize e junte os dedos</h2><p>A tela se divide em 8 faixas: Dó Ré Mi Fá Sol Lá Si Dó. Mão esquerda com 1, 2 ou 3 dedos muda a oitava.</p></div>
           <div className="segmented" role="group" aria-label="Oitava">{OCTAVES.map((item, index) =>
-            <button key={item.name} type="button" className={octave === index ? "active" : ""} onClick={() => pickOctave(index)}>{index + 1} · {item.name}</button>)}</div>
+            <button key={item.name} type="button" className={octave === index ? "active" : ""} onClick={() => pickOctave(index)}>{item.name}</button>)}</div>
           <div className="note-chips">{zoneMidis.map((midi, index) => <span key={midi} className={zone === index ? "active" : ""} style={{ "--note": noteColor(midi) } as React.CSSProperties}>{solfege(midi)}</span>)}</div>
         </>}
 
         {mode === "song" && <>
           <div className="panel-heading"><span className="eyebrow">BIBLIOTECA</span><h2>Toque no seu ritmo</h2><p>Cada pinça toca a próxima nota. Segure para alongar, solte para a pausa.</p></div>
           <div className="song-list">{SONGS.map((item, index) => <button key={item.id} type="button" className={`song-button ${songIndex === index ? "selected" : ""}`} onClick={() => pickSong(index)} aria-pressed={songIndex === index}>
-            <strong>{item.title}</strong><small>{item.subtitle} · {item.notes.length} notas</small></button>)}</div>
+            <strong>{item.title}</strong><small>{item.subtitle}, {item.notes.length} notas</small></button>)}</div>
           <div className="song-actions"><button type="button" className="btn ghost" onClick={demoPlaying ? stopDemo : listenSong}>{demoPlaying ? "Parar" : "▶ Ouvir"}</button><button type="button" className="btn ghost" onClick={restartSong}>↺ Reiniciar</button></div>
         </>}
       </aside>
@@ -647,6 +705,7 @@ function App() {
           <label className="slider"><span>Sensibilidade da pinça <b>{Math.round(sensitivity * 100)}%</b></span>
             <input type="range" min="0" max="1" step="0.01" value={sensitivity} onChange={(event) => setSensitivity(Number(event.target.value))} /></label>
         </div>}
+        {cameraOn && fps > 0 && fps < 20 && <p className="tip">FPS baixo. Mais luz no ambiente faz a webcam captar mais quadros por segundo.</p>}
         <div className="field-label">SOM</div>
         <div className="preset-grid">{PRESETS.map((preset, index) => <button key={preset.id} type="button" className={`preset-card ${presetIndex === index ? "active" : ""}`} onClick={() => choosePreset(index)} aria-pressed={presetIndex === index}><strong>{preset.name}</strong><small>{preset.mood}</small></button>)}</div>
         <div className="effects"><label className="slider"><span>Eco <b>{Math.round(echo * 100)}%</b></span><input type="range" min="0" max="1" step="0.01" value={echo} onChange={(event) => { const value = Number(event.target.value); setEcho(value); synthRef.current.setEffects(value, space); }} /></label><label className="slider"><span>Espaço <b>{Math.round(space * 100)}%</b></span><input type="range" min="0" max="1" step="0.01" value={space} onChange={(event) => { const value = Number(event.target.value); setSpace(value); synthRef.current.setEffects(echo, value); }} /></label></div>
@@ -686,4 +745,14 @@ function App() {
   </div>;
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+function Root() {
+  const [about, setAbout] = useState(() => location.hash.startsWith("#/sobre"));
+  useEffect(() => {
+    const onHash = () => { setAbout(location.hash.startsWith("#/sobre")); window.scrollTo(0, 0); };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  return about ? <Landing /> : <App />;
+}
+
+createRoot(document.getElementById("root")!).render(<Root />);

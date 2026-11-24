@@ -32,10 +32,18 @@ export type SoundPreset = {
   cutoff: number;
   echo: number;
   space: number;
+  /** Vozes desafinadas por nota (supersaw). Padrão 2. */
+  unison?: number;
+  /** Abertura em cents entre as vozes. */
+  spread?: number;
+  /** 0..1: brilho de uma oitava acima, para o som "dreamscape". */
+  shimmer?: number;
 };
 
 export const PRESETS: SoundPreset[] = [
   { id: "abyss", name: "Abismo", mood: "pad dark ambient", wave: "sawtooth", attack: 0.9, decay: 1.2, sustain: 0.85, release: 3.4, cutoff: 650, echo: 0.5, space: 0.88 },
+  { id: "synthwave", name: "Synthwave", mood: "neon e retrô", wave: "sawtooth", unison: 5, spread: 16, attack: 0.05, decay: 1.4, sustain: 0.72, release: 1.5, cutoff: 2600, echo: 0.42, space: 0.55 },
+  { id: "dream", name: "Dreamscape", mood: "sonho e brilho", wave: "triangle", unison: 3, spread: 9, shimmer: 0.38, attack: 0.5, decay: 1.6, sustain: 0.7, release: 2.8, cutoff: 3400, echo: 0.55, space: 0.86 },
   { id: "mist", name: "Névoa", mood: "pad aberto e frio", wave: "triangle", attack: 0.7, decay: 1, sustain: 0.85, release: 3, cutoff: 1300, echo: 0.42, space: 0.8 },
   { id: "piano", name: "Piano", mood: "claro e direto", wave: "triangle", attack: 0.006, decay: 1.6, sustain: 0.28, release: 0.45, cutoff: 5200, echo: 0.1, space: 0.22 },
   { id: "bell", name: "Sino", mood: "cristalino", wave: "sine", attack: 0.004, decay: 2.4, sustain: 0.05, release: 1.2, cutoff: 7000, echo: 0.3, space: 0.45 },
@@ -139,8 +147,10 @@ export class Synth {
     if (!context) return;
     this.stop();
     const now = context.currentTime;
-    const { attack, decay, sustain, wave } = this.preset;
-    const peak = (0.13 * velocity) / Math.sqrt(notes.length);
+    const { attack, decay, sustain, wave, shimmer = 0 } = this.preset;
+    const unison = this.preset.unison ?? 2;
+    const spread = this.preset.spread ?? 6;
+    const peak = (0.13 * velocity * Math.sqrt(2 / unison)) / Math.sqrt(notes.length);
     const oscillators: OscillatorNode[] = [];
     const gains: GainNode[] = [];
     for (const note of notes) {
@@ -149,14 +159,24 @@ export class Synth {
       gain.gain.linearRampToValueAtTime(peak, now + attack);
       gain.gain.setTargetAtTime(peak * sustain, now + attack, decay / 3);
       gain.connect(this.filter!);
-      for (const detune of [0, 6]) {
+      for (let voice = 0; voice < unison; voice++) {
         const oscillator = context.createOscillator();
         oscillator.type = wave;
         oscillator.frequency.value = midiFrequency(note);
-        oscillator.detune.value = detune;
+        oscillator.detune.value = unison === 2 ? (voice ? spread : 0) : (voice / (unison - 1) - 0.5) * 2 * spread;
         oscillator.connect(gain);
         oscillator.start(now);
         oscillators.push(oscillator);
+      }
+      if (shimmer > 0) {
+        const bell = context.createOscillator();
+        const bellGain = context.createGain();
+        bell.type = "sine";
+        bell.frequency.value = midiFrequency(note + 12);
+        bellGain.gain.value = shimmer;
+        bell.connect(bellGain).connect(gain);
+        bell.start(now);
+        oscillators.push(bell);
       }
       gains.push(gain);
     }

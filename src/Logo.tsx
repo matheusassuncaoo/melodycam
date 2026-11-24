@@ -22,6 +22,7 @@ export function LogoMark({ size = 32, title = "Melodycam" }: { size?: number; ti
   </svg>;
 }
 
-export function Wordmark() {
-  return <span className="wordmark"><LogoMark size={30} /><span className="wordmark-text">melody<b>cam</b></span></span>;
+export function Wordmark({ href }: { href?: string }) {
+  const content = <><LogoMark size={30} /><span className="wordmark-text">melody<b>cam</b></span></>;
+  return href ? <a className="wordmark" href={href} aria-label="Sobre o Melodycam">{content}</a> : <span className="wordmark">{content}</span>;
 }

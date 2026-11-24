@@ -53,12 +53,12 @@ export function pinchRatio(points: Point[]): number {
 export class PinchDetector {
   private active = false;
   private streak = 0;
-  constructor(private engage = 0.32, private release = 0.5) {}
+  constructor(private engage = 0.36, private release = 0.55) {}
 
   setSensitivity(value: number): void {
     // value 0..1: mais alto = pinça mais fácil de detectar.
-    this.engage = 0.2 + value * 0.22;
-    this.release = this.engage + 0.16;
+    this.engage = 0.22 + value * 0.23;
+    this.release = this.engage + 0.19;
   }
 
   update(ratio: number): boolean {
@@ -91,13 +91,24 @@ export class VoteFilter {
   reset(): void { this.window = []; this.current = 0; }
 }
 
+/** Média móvel exponencial: tira o tremor sem atrasar de forma perceptível. */
+export class Ema {
+  private value: number | null = null;
+  constructor(private alpha = 0.5) {}
+  update(sample: number): number {
+    this.value = this.value === null ? sample : this.value + this.alpha * (sample - this.value);
+    return this.value;
+  }
+  reset(): void { this.value = null; }
+}
+
 /** Divide uma faixa horizontal em zonas com margem, para não "tremer" na fronteira. */
 export class ZoneSelector {
   private current = -1;
   constructor(private count: number, private min: number, private max: number, private margin = 0.22) {}
 
-  update(x: number): number {
-    const raw = Math.max(0, Math.min(this.count - 1e-6, ((x - this.min) / (this.max - this.min)) * this.count));
+  update(x: number, min = this.min, max = this.max): number {
+    const raw = Math.max(0, Math.min(this.count - 1e-6, ((x - min) / (max - min)) * this.count));
     if (this.current < 0) { this.current = Math.floor(raw); return this.current; }
     if (raw < this.current - this.margin || raw > this.current + 1 + this.margin) this.current = Math.floor(raw);
     return this.current;

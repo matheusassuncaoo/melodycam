@@ -1,5 +1,4 @@
 import { FilesetResolver, HandLandmarker, type NormalizedLandmark } from "@mediapipe/tasks-vision";
-import { noteColor } from "./notes";
 
 const LOCAL_MODEL = "/models/hand_landmarker.task";
 const REMOTE_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
@@ -57,7 +56,7 @@ export type ZoneOverlay = {
   min: number;
   max: number;
   active: number;
-  midis: number[];
+  colors: string[];
   labels: string[];
 };
 
@@ -90,12 +89,13 @@ export function drawOverlay(
   };
 
   if (zones) {
-    const top = H * 0.4;
-    const bottom = H * 0.8;
+    const compact = W <= 900;
+    const top = H * (compact ? 0.28 : 0.4);
+    const bottom = H * (compact ? 0.6 : 0.8);
     const bandW = ((zones.max - zones.min) * W) / zones.count;
     for (let i = 0; i < zones.count; i++) {
       const x = zones.min * W + i * bandW;
-      const color = noteColor(zones.midis[i]);
+      const color = zones.colors[i];
       const active = i === zones.active;
       const gradient = ctx.createLinearGradient(0, top, 0, bottom);
       gradient.addColorStop(0, color + (active ? "55" : "1a"));
@@ -117,12 +117,9 @@ export function drawOverlay(
     ctx.strokeStyle = hand.color;
     ctx.globalAlpha = 0.85;
     ctx.lineWidth = 3;
-    ctx.shadowColor = hand.color;
-    ctx.shadowBlur = 10;
     ctx.beginPath();
     for (const { start, end } of connections) { ctx.moveTo(px[start].x, px[start].y); ctx.lineTo(px[end].x, px[end].y); }
     ctx.stroke();
-    ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
     px.forEach((p, index) => {
       const tip = [4, 8, 12, 16, 20].includes(index);
@@ -156,11 +153,8 @@ export function drawOverlay(
       ctx.arc(at.x, at.y, hand.pinchActive ? 22 : 15, 0, Math.PI * 2);
       ctx.strokeStyle = hand.pinchActive ? "#ffffff" : hand.color;
       ctx.lineWidth = hand.pinchActive ? 4 : 2;
-      ctx.shadowColor = hand.color;
-      ctx.shadowBlur = hand.pinchActive ? 24 : 0;
       ctx.stroke();
       if (hand.pinchActive) { ctx.fillStyle = hand.color + "66"; ctx.fill(); }
-      ctx.shadowBlur = 0;
     }
   }
 }

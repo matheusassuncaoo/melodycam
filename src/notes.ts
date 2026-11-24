@@ -61,30 +61,39 @@ const ROOT_NAMES: Record<string, string> = { C: "Dó", D: "Ré", E: "Mi", F: "F�
 
 /** Monta um acorde em pad largo e grave (raiz, oitava, terça e quinta abertas), pensado para ambient. */
 export function makeChord(symbol: string, fingers: number): Chord {
-  const match = /^([A-G])([#b]?)(m?)$/.exec(symbol);
+  const match = /^([A-G])([#b]?)(maj7|m7|m|dim)?$/.exec(symbol);
   if (!match) throw new Error(`Acorde inválido: ${symbol}`);
   const [, letter, accidental, minor] = match;
   const pitchClass = (ROOTS[letter] + (accidental === "#" ? 1 : accidental === "b" ? -1 : 0) + 12) % 12;
   const root = 36 + pitchClass;
-  const third = minor ? 3 : 4;
+  const quality = minor ?? "";
+  const third = quality === "m" || quality === "m7" || quality === "dim" ? 3 : 4;
+  const fifth = quality === "dim" ? 6 : 7;
+  const seventh = quality === "maj7" ? 11 : quality === "m7" ? 10 : 0;
   return {
     symbol,
-    name: `${ROOT_NAMES[letter]}${accidental === "#" ? "♯" : accidental === "b" ? "♭" : ""} ${minor ? "menor" : "maior"}`,
-    notes: [root, root + 12, root + 12 + third, root + 19, root + 24 + third],
+    name: `${ROOT_NAMES[letter]}${accidental === "#" ? "♯" : accidental === "b" ? "♭" : ""} ${{ "": "maior", m: "menor", dim: "diminuto", maj7: "maior com sétima", m7: "menor com sétima" }[quality]}`,
+    notes: seventh
+      ? [root, root + 12, root + 12 + third, root + 12 + fifth, root + 12 + seventh]
+      : [root, root + 12, root + 12 + third, root + 12 + fifth, root + 24 + third],
     fingers,
     degree: "",
     color: noteColor(pitchClass)
   };
 }
 
-export type Progression = { id: string; title: string; subtitle: string; chords: Chord[] };
+/** "fingers": a mão esquerda escolhe pelo número de dedos (até 5). "zones": a mão que toca desliza por faixas (até 8). */
+export type Progression = { id: string; title: string; subtitle: string; chords: Chord[]; select: "fingers" | "zones" };
 
 const progression = (id: string, title: string, subtitle: string, symbols: string[]): Progression =>
-  ({ id, title, subtitle, chords: symbols.map((symbol, index) => makeChord(symbol, index + 1)) });
+  ({ id, title, subtitle, chords: symbols.map((symbol, index) => makeChord(symbol, index + 1)), select: symbols.length > 5 ? "zones" : "fingers" });
 
 /** Dedo 1 = primeiro acorde, dedo 2 = segundo, e assim por diante. */
 export const PROGRESSIONS: Progression[] = [
-  progression("creep", "Creep", "Radiohead · G B C Cm", ["G", "B", "C", "Cm"]),
+  progression("creep", "Creep", "Radiohead, G B C Cm", ["G", "B", "C", "Cm"]),
+  progression("campo", "Campo de Dó", "Dó Ré Mi Fá Sol Lá Si Dó", ["C", "Dm", "Em", "F", "G", "Am", "Bdim", "C"]),
+  progression("dream", "Dreamscape", "Fmaj7 Em7 Dm7 Cmaj7", ["Fmaj7", "Em7", "Dm7", "Cmaj7"]),
+  progression("neon", "Neon", "Am7 Fmaj7 Cmaj7 G", ["Am7", "Fmaj7", "Cmaj7", "G"]),
   progression("sombra", "Sombra", "Am F C G", ["Am", "F", "C", "G"]),
   progression("nevoa", "Névoa", "Em C G D", ["Em", "C", "G", "D"]),
   progression("abismo", "Abismo", "Dm B♭ F C", ["Dm", "Bb", "F", "C"]),
