@@ -1,6 +1,6 @@
 # Especificação do produto: Melodycam
 
-**Status:** especificação em evolução; instrumento de acordes e melodia em protótipo. **Data:** 23/11/2026. **Idioma da interface inicial:** português (pt-BR).
+**Status:** especificação em evolução; protótipo com modos Acordes, Notas (Dó–Si) e Músicas (biblioteca inicial). **Data:** 23/11/2026. **Idioma da interface inicial:** português (pt-BR).
 
 ## 1. Contexto e objetivo
 

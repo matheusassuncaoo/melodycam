@@ -1,12 +1,4 @@
-export type Chord = { symbol: string; name: string; notes: number[]; fingers: number; color: string };
-
-export const CHORDS: Chord[] = [
-  { symbol: "E", name: "Mi maior", notes: [52, 56, 59, 64], fingers: 1, color: "#e9b65d" },
-  { symbol: "A", name: "Lá maior", notes: [57, 61, 64], fingers: 2, color: "#dd9c83" },
-  { symbol: "B", name: "Si maior", notes: [59, 63, 66], fingers: 3, color: "#a8b8e9" },
-  { symbol: "C#m", name: "Dó♯ menor", notes: [61, 64, 68], fingers: 4, color: "#a9c9b2" },
-  { symbol: "Am", name: "Lá menor", notes: [57, 60, 64], fingers: 5, color: "#c6a5d8" }
-];
+import { midiFrequency } from "./notes";
 
 export type RecordedEvent = {
   type: "chord" | "note";
@@ -22,13 +14,9 @@ export type Project = {
   title: string;
   mode: "chords" | "performance";
   tempoBpm: number;
-  scale: { tonic: "E"; type: "major" };
+  scale: { tonic: "C" | "E"; type: "major" };
   events: RecordedEvent[];
 };
-
-export function midiFrequency(note: number): number {
-  return 440 * 2 ** ((note - 69) / 12);
-}
 
 export type SoundPreset = {
   id: string;
@@ -36,6 +24,10 @@ export type SoundPreset = {
   mood: string;
   wave: OscillatorType;
   attack: number;
+  /** Tempo (s) para cair até o nível de sustentação. */
+  decay: number;
+  /** 0..1: nível mantido enquanto o gesto segura a nota. */
+  sustain: number;
   release: number;
   cutoff: number;
   echo: number;
@@ -43,10 +35,12 @@ export type SoundPreset = {
 };
 
 export const PRESETS: SoundPreset[] = [
-  { id: "void", name: "Void", mood: "escuro e profundo", wave: "sine", attack: 1.2, release: 2.8, cutoff: 1100, echo: 0.36, space: 0.72 },
-  { id: "haze", name: "Haze", mood: "névoa e textura", wave: "triangle", attack: 0.6, release: 2.1, cutoff: 2200, echo: 0.26, space: 0.6 },
-  { id: "drift", name: "Drift", mood: "pulsos no espaço", wave: "sine", attack: 0.12, release: 1.35, cutoff: 1700, echo: 0.6, space: 0.45 },
-  { id: "glow", name: "Glow", mood: "brilho etéreo", wave: "triangle", attack: 0.35, release: 1.7, cutoff: 3600, echo: 0.38, space: 0.55 }
+  { id: "piano", name: "Piano", mood: "claro e direto", wave: "triangle", attack: 0.006, decay: 1.6, sustain: 0.28, release: 0.45, cutoff: 5200, echo: 0.1, space: 0.22 },
+  { id: "bell", name: "Sino", mood: "cristalino", wave: "sine", attack: 0.004, decay: 2.4, sustain: 0.05, release: 1.2, cutoff: 7000, echo: 0.3, space: 0.45 },
+  { id: "glow", name: "Glow", mood: "brilho etéreo", wave: "triangle", attack: 0.05, decay: 0.8, sustain: 0.8, release: 1.1, cutoff: 3600, echo: 0.34, space: 0.5 },
+  { id: "haze", name: "Haze", mood: "névoa e textura", wave: "sawtooth", attack: 0.12, decay: 0.8, sustain: 0.7, release: 1.4, cutoff: 1500, echo: 0.26, space: 0.6 },
+  { id: "drift", name: "Drift", mood: "pulsos no espaço", wave: "sine", attack: 0.03, decay: 0.6, sustain: 0.65, release: 1.0, cutoff: 2400, echo: 0.6, space: 0.45 },
+  { id: "void", name: "Void", mood: "escuro e profundo", wave: "sine", attack: 0.18, decay: 0.5, sustain: 0.9, release: 2.2, cutoff: 1100, echo: 0.36, space: 0.72 }
 ];
 
 type Voice = { oscillators: OscillatorNode[]; gains: GainNode[] };
@@ -62,26 +56,31 @@ export class Synth {
   private echo = PRESETS[0].echo;
   private space = PRESETS[0].space;
 
+  get isReady(): boolean { return this.context?.state === "running"; }
+
   async ready(): Promise<void> {
     if (!this.context) {
-      const context = new AudioContext();
+      const context = new AudioContext({ latencyHint: "interactive" });
       this.context = context;
       const filter = context.createBiquadFilter();
       filter.type = "lowpass";
       filter.frequency.value = this.preset.cutoff;
       this.filter = filter;
       const master = context.createGain();
-      master.gain.value = 0.8;
+      master.gain.value = 0.9;
+      const limiter = context.createDynamicsCompressor();
+      limiter.threshold.value = -14;
+      limiter.ratio.value = 6;
       const analyser = context.createAnalyser();
       analyser.fftSize = 2048;
       this.analyser = analyser;
       filter.connect(master);
-      master.connect(analyser).connect(context.destination);
+      master.connect(limiter).connect(analyser).connect(context.destination);
 
       const delay = context.createDelay(2);
-      delay.delayTime.value = 0.42;
+      delay.delayTime.value = 0.36;
       const feedback = context.createGain();
-      feedback.gain.value = 0.36;
+      feedback.gain.value = 0.34;
       const echoWet = context.createGain();
       echoWet.gain.value = this.echo * 0.42;
       this.echoWet = echoWet;
@@ -90,8 +89,7 @@ export class Synth {
       delay.connect(echoWet).connect(master);
 
       const convolver = context.createConvolver();
-      const seconds = 2.8;
-      const length = Math.floor(context.sampleRate * seconds);
+      const length = Math.floor(context.sampleRate * 2.6);
       const impulse = context.createBuffer(2, length, context.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const data = impulse.getChannelData(channel);
@@ -109,7 +107,7 @@ export class Synth {
   setPreset(preset: SoundPreset): void {
     this.preset = preset;
     this.setEffects(preset.echo, preset.space);
-    this.filter?.frequency.setTargetAtTime(preset.cutoff, this.context!.currentTime, 0.1);
+    if (this.context) this.filter?.frequency.setTargetAtTime(preset.cutoff, this.context.currentTime, 0.05);
   }
 
   setEffects(echo: number, space: number): void {
@@ -127,30 +125,30 @@ export class Synth {
     return data;
   }
 
-  play(notes: number[]): void {
+  play(notes: number[], velocity = 1): void {
     const context = this.context;
     if (!context) return;
     this.stop();
     const now = context.currentTime;
+    const { attack, decay, sustain, wave } = this.preset;
+    const peak = (0.13 * velocity) / Math.sqrt(notes.length);
     const oscillators: OscillatorNode[] = [];
     const gains: GainNode[] = [];
     for (const note of notes) {
-      const oscillator = context.createOscillator();
-      oscillator.type = this.preset.wave;
-      oscillator.frequency.value = midiFrequency(note);
-      const detune = context.createOscillator();
-      detune.type = this.preset.wave;
-      detune.frequency.value = midiFrequency(note);
-      detune.detune.value = 7;
       const gain = context.createGain();
       gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.025 / Math.sqrt(notes.length), now + 0.035);
-      gain.gain.linearRampToValueAtTime(0.085 / Math.sqrt(notes.length), now + this.preset.attack);
-      oscillator.connect(gain).connect(this.filter!);
-      detune.connect(gain);
-      oscillator.start(now);
-      detune.start(now);
-      oscillators.push(oscillator, detune);
+      gain.gain.linearRampToValueAtTime(peak, now + attack);
+      gain.gain.setTargetAtTime(peak * sustain, now + attack, decay / 3);
+      gain.connect(this.filter!);
+      for (const detune of [0, 6]) {
+        const oscillator = context.createOscillator();
+        oscillator.type = wave;
+        oscillator.frequency.value = midiFrequency(note);
+        oscillator.detune.value = detune;
+        oscillator.connect(gain);
+        oscillator.start(now);
+        oscillators.push(oscillator);
+      }
       gains.push(gain);
     }
     this.voice = { oscillators, gains };
@@ -159,11 +157,14 @@ export class Synth {
   stop(): void {
     if (!this.context || !this.voice) return;
     const now = this.context.currentTime;
+    const release = this.preset.release;
     for (const gain of this.voice.gains) {
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.setTargetAtTime(0, now, this.preset.release / 5);
+      const param = gain.gain;
+      if (typeof param.cancelAndHoldAtTime === "function") param.cancelAndHoldAtTime(now);
+      else param.cancelScheduledValues(now);
+      param.setTargetAtTime(0, now, release / 5);
     }
-    for (const oscillator of this.voice.oscillators) oscillator.stop(now + this.preset.release * 1.5);
+    for (const oscillator of this.voice.oscillators) oscillator.stop(now + release * 1.5);
     this.voice = null;
   }
 

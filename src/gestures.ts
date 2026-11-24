@@ -1,47 +1,108 @@
-import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
+/**
+ * Leitura de gestos. Usa os pontos "world" do MediaPipe (3D, em metros, centrados na mão):
+ * não dependem da distância até a câmera, da proporção do vídeo nem da rotação da mão.
+ */
 
-export type HandState = { landmarks: NormalizedLandmark[]; fingers: number; pinching: boolean };
+export type Point = { x: number; y: number; z: number };
 
-const FINGER_JOINTS = [[8, 6], [12, 10], [16, 14], [20, 18]] as const;
-
-function distance(a: NormalizedLandmark, b: NormalizedLandmark): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+function dist(a: Point, b: Point): number {
+  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
-export function countFingers(points: NormalizedLandmark[]): number {
-  if (points.length < 21) return 0;
-  let count = 0;
-  for (const [tip, middle] of FINGER_JOINTS) {
-    if (distance(points[tip], points[0]) > distance(points[middle], points[0]) * 1.12) count++;
-  }
-  const thumbOpen = distance(points[4], points[17]) > distance(points[3], points[17]) * 1.12;
-  return count + Number(thumbOpen);
+/** Ângulo (graus) no ponto b formado por a-b-c. 180 = reto. */
+function angle(a: Point, b: Point, c: Point): number {
+  const v1 = { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+  const v2 = { x: c.x - b.x, y: c.y - b.y, z: c.z - b.z };
+  const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+  const norm = Math.hypot(v1.x, v1.y, v1.z) * Math.hypot(v2.x, v2.y, v2.z);
+  if (norm === 0) return 0;
+  return (Math.acos(Math.max(-1, Math.min(1, dot / norm))) * 180) / Math.PI;
 }
 
-export function isPinching(points: NormalizedLandmark[], previous: boolean): boolean {
-  if (points.length < 21) return false;
-  const width = Math.max(distance(points[5], points[17]), 0.01);
-  const ratio = distance(points[4], points[8]) / width;
-  return ratio < (previous ? 0.48 : 0.35);
+/** Cada dedo: [base (MCP), junta do meio (PIP), ponta (TIP)]. */
+const FINGERS = [[5, 6, 8], [9, 10, 12], [13, 14, 16], [17, 18, 20]] as const;
+
+export type FingerReading = { count: number; extended: boolean[] };
+
+export function readFingers(points: Point[]): FingerReading {
+  if (points.length < 21) return { count: 0, extended: [false, false, false, false, false] };
+  const palm = Math.max(dist(points[0], points[9]), 1e-4);
+  const extended = FINGERS.map(([mcp, pip, tip]) => {
+    const straight = angle(points[mcp], points[pip], points[tip]) > 130;
+    const reaching = dist(points[tip], points[0]) > dist(points[pip], points[0]) * 1.15;
+    return straight && reaching;
+  });
+  // Polegar: reto e afastado da palma (ponta longe da base do mindinho).
+  const thumbStraight = angle(points[2], points[3], points[4]) > 135;
+  const thumbOut = dist(points[4], points[17]) / palm > 0.95 && dist(points[4], points[5]) / palm > 0.5;
+  // Com os quatro dedos abertos a dúvida é só "4 ou 5": aceita o polegar mais encostado na palma.
+  const openHand = extended.every(Boolean) && dist(points[4], points[13]) / palm > 0.62;
+  const thumb = (thumbStraight && thumbOut) || openHand;
+  const all = [thumb, ...extended];
+  return { count: all.filter(Boolean).length, extended: all };
 }
 
-export class StableSelection {
-  private candidate = 0;
-  private since = 0;
-  private selected = 0;
+/** 0 = dedos separados, 1 = pinça totalmente aberta. Menor = mais fechada. */
+export function pinchRatio(points: Point[]): number {
+  if (points.length < 21) return 1;
+  const palm = Math.max(dist(points[0], points[9]), 1e-4);
+  return dist(points[4], points[8]) / palm;
+}
 
-  update(value: number, now: number): number {
-    if (value !== this.candidate) {
-      this.candidate = value;
-      this.since = now;
-    }
-    if (value > 0 && now - this.since >= 180) this.selected = value;
-    return this.selected;
+/** Histerese: fecha abaixo de `engage`, só abre acima de `release`. */
+export class PinchDetector {
+  private active = false;
+  private streak = 0;
+  constructor(private engage = 0.32, private release = 0.5) {}
+
+  setSensitivity(value: number): void {
+    // value 0..1: mais alto = pinça mais fácil de detectar.
+    this.engage = 0.2 + value * 0.22;
+    this.release = this.engage + 0.16;
   }
 
-  reset(): void {
-    this.candidate = 0;
-    this.since = 0;
-    this.selected = 0;
+  update(ratio: number): boolean {
+    const wants = this.active ? ratio < this.release : ratio < this.engage;
+    if (wants === this.active) { this.streak = 0; return this.active; }
+    // Confirma por 2 quadros para ignorar tremor, sem atrasar de forma perceptível.
+    this.streak++;
+    if (this.streak >= 2) { this.active = wants; this.streak = 0; }
+    return this.active;
   }
+
+  reset(): void { this.active = false; this.streak = 0; }
+}
+
+/** Voto majoritário nos últimos N quadros: o valor só muda quando a maioria concorda. */
+export class VoteFilter {
+  private window: number[] = [];
+  private current = 0;
+  constructor(private size = 6, private need = 4) {}
+
+  update(value: number): number {
+    this.window.push(value);
+    if (this.window.length > this.size) this.window.shift();
+    const counts = new Map<number, number>();
+    for (const item of this.window) counts.set(item, (counts.get(item) ?? 0) + 1);
+    for (const [item, count] of counts) if (count >= this.need) this.current = item;
+    return this.current;
+  }
+
+  reset(): void { this.window = []; this.current = 0; }
+}
+
+/** Divide uma faixa horizontal em zonas com margem, para não "tremer" na fronteira. */
+export class ZoneSelector {
+  private current = -1;
+  constructor(private count: number, private min: number, private max: number, private margin = 0.22) {}
+
+  update(x: number): number {
+    const raw = Math.max(0, Math.min(this.count - 1e-6, ((x - this.min) / (this.max - this.min)) * this.count));
+    if (this.current < 0) { this.current = Math.floor(raw); return this.current; }
+    if (raw < this.current - this.margin || raw > this.current + 1 + this.margin) this.current = Math.floor(raw);
+    return this.current;
+  }
+
+  get zones(): { count: number; min: number; max: number } { return { count: this.count, min: this.min, max: this.max }; }
+  reset(): void { this.current = -1; }
 }
