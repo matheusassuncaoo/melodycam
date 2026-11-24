@@ -70,6 +70,13 @@ export class PinchDetector {
     return this.active;
   }
 
+  /** Limiares calibrados pela pessoa: "aberta" e "fechada" medidas na própria mão. */
+  setCustom(open: number, closed: number): void {
+    const span = Math.max(0.12, open - closed);
+    this.engage = closed + span * 0.4;
+    this.release = closed + span * 0.65;
+  }
+
   reset(): void { this.active = false; this.streak = 0; }
 }
 
@@ -115,5 +122,6 @@ export class ZoneSelector {
   }
 
   get zones(): { count: number; min: number; max: number } { return { count: this.count, min: this.min, max: this.max }; }
+  get index(): number { return Math.max(0, this.current); }
   reset(): void { this.current = -1; }
 }

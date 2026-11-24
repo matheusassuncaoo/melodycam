@@ -1,100 +1,215 @@
+import { useLayoutEffect, useRef } from "react";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { LogoMark, Wordmark } from "./Logo";
+import { LangSwitch, t, useLang } from "./i18n";
 import { PRESETS } from "./music";
 import { PROGRESSIONS, noteColor, solfege } from "./notes";
 import { SONGS } from "./songs";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const GITHUB_PROFILE = "https://github.com/matheusassuncaoo";
 const GITHUB_REPO = "https://github.com/matheusassuncaoo/melodycam";
 
 const SPECTRUM = [60, 62, 64, 65, 67, 69, 71];
-
-const FEATURES = [
-  { title: "Ambient com as mãos", color: noteColor(67), text: "Escolha uma progressão, como Creep, e os dedos da mão esquerda trocam o acorde enquanto a direita segura o pad. Timbres dark ambient, synthwave e dreamscape." },
-  { title: "Dó Ré Mi Fá Sol Lá Si Dó", color: noteColor(64), text: "A tela vira uma escala de oito faixas coloridas. Deslize a mão, junte polegar e indicador e a nota soa, sem precisar saber teoria." },
-  { title: "Músicas para tocar", color: noteColor(60), text: "Uma biblioteca de melodias conhecidas. Cada pinça toca a próxima nota, e o teclado mostra qual vem em seguida." }
-];
-
-const STEPS = [
-  { n: "01", title: "Ative a câmera", text: "Fique de frente, com luz e as mãos à vista. Nada é enviado a servidor." },
-  { n: "02", title: "A esquerda escolhe", text: "De 1 a 5 dedos para trocar o acorde ou a oitava." },
-  { n: "03", title: "A direita toca", text: "Junte polegar e indicador. Segure para sustentar, solte para soltar o som." }
-];
-
-const PIPELINE = [
-  { title: "Câmera", detail: "getUserMedia em até 960×540. Em ambiente escuro o quadro ganha brilho adaptativo antes da detecção." },
-  { title: "Detecção", detail: "MediaPipe Hand Landmarker em WebAssembly, com GPU e CPU de reserva. Devolve 21 pontos 3D por mão." },
-  { title: "Gestos", detail: "Dedos pelo ângulo das articulações, pinça pela razão polegar e indicador sobre a palma. Votação, histerese e média móvel removem o tremor." },
-  { title: "Som", detail: "Web Audio API: osciladores com vozes desafinadas, filtro, eco com realimentação, reverb por convolução e envelopes." },
-  { title: "Interface", detail: "React, TypeScript e Vite. Um canvas desenha as mãos alinhadas ao vídeo e as faixas coloridas por cima." }
-];
+const DEMO_NOTES = [60, 62, 64, 65, 67, 69, 71, 72];
+const DEMO_PATH = [0, 2, 4, 2, 5, 7, 4, 1];
 
 function scrollTo(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 export function Landing() {
-  return <div className="landing">
+  const { lang } = useLang();
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const headline = t("land.h1").split("|");
+  const perks = [t("land.perk1"), t("land.perk2"), t("land.perk3"), t("land.perk4")];
+  const features = [
+    { title: t("land.f1t"), text: t("land.f1p"), color: noteColor(67) },
+    { title: t("land.f2t"), text: t("land.f2p"), color: noteColor(64) },
+    { title: t("land.f3t"), text: t("land.f3p"), color: noteColor(60) }
+  ];
+  const steps = [
+    { n: "01", title: t("land.st1t"), text: t("land.st1p") },
+    { n: "02", title: t("land.st2t"), text: t("land.st2p") },
+    { n: "03", title: t("land.st3t"), text: t("land.st3p") }
+  ];
+  const stats = [
+    { value: PROGRESSIONS.length, label: t("land.stat1") },
+    { value: PRESETS.length, label: t("land.stat2") },
+    { value: SONGS.length, label: t("land.stat3") },
+    { value: 0, label: t("land.stat4") }
+  ];
+  const pipeline = [
+    { title: t("land.p1t"), detail: t("land.p1p") },
+    { title: t("land.p2t"), detail: t("land.p2p") },
+    { title: t("land.p3t"), detail: t("land.p3p") },
+    { title: t("land.p4t"), detail: t("land.p4p") },
+    { title: t("land.p5t"), detail: t("land.p5p") }
+  ];
+
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        // Entrada do hero
+        const intro = gsap.timeline({ defaults: { ease: "power3.out" } });
+        intro
+          .from(".landing-hero .logo-mark", { scale: 0.5, opacity: 0, rotate: -12, duration: 0.9, ease: "back.out(1.7)" })
+          .from(".landing-hero .logo-mark .bar", { scaleY: 0, duration: 0.8, stagger: 0.08, ease: "elastic.out(1, 0.55)" }, "<0.1")
+          .from(".landing-hero .eyebrow", { opacity: 0, y: 12, letterSpacing: "0.5em", duration: 0.7 }, "-=0.5")
+          .from(".landing-hero .w", { yPercent: 115, duration: 0.95, stagger: 0.08, ease: "power4.out" }, "-=0.45")
+          .from(".landing-hero .lead", { opacity: 0, y: 20, duration: 0.7 }, "-=0.55")
+          .from(".landing-cta > *", { opacity: 0, y: 20, scale: 0.94, duration: 0.6, stagger: 0.1 }, "-=0.45")
+          .from(".perks span", { opacity: 0, y: 12, duration: 0.5, stagger: 0.07 }, "-=0.4")
+          .from(".spectrum span", { scaleY: 0, transformOrigin: "50% 100%", duration: 0.6, stagger: 0.06, ease: "back.out(1.6)" }, "-=0.5");
+
+        // Movimento contínuo de fundo e logo
+        gsap.to(".aura-one", { x: 90, y: 50, duration: 11, yoyo: true, repeat: -1, ease: "sine.inOut" });
+        gsap.to(".aura-two", { x: -70, y: -40, duration: 14, yoyo: true, repeat: -1, ease: "sine.inOut" });
+        gsap.to(".landing-hero .logo-mark .bar", {
+          scaleY: () => gsap.utils.random(0.65, 1.12), duration: 0.9, yoyo: true, repeat: -1, stagger: 0.13, ease: "sine.inOut", delay: 2.2
+        });
+        gsap.to(".spectrum", { backgroundPosition: "200% 0", duration: 8, repeat: -1, ease: "none" });
+
+        // Demo viva: o anel passeia pelas faixas e cada nota acende
+        const label = rootRef.current?.querySelector<HTMLElement>(".demo-note");
+        const demo = gsap.timeline({ repeat: -1, repeatDelay: 0.4, scrollTrigger: { trigger: ".demo", start: "top 90%", toggleActions: "play pause resume pause" } });
+        DEMO_PATH.forEach((zone, step) => {
+          demo.to(".demo-ring", { left: `${(zone + 0.5) * 12.5}%`, top: `${30 + Math.sin(step * 1.7) * 18}%`, duration: 0.7, ease: "power2.inOut" })
+            .to(".demo-ring", { scale: 0.6, duration: 0.12, ease: "power2.in" }, ">-0.05")
+            .call(() => { if (label) { label.textContent = solfege(DEMO_NOTES[zone]); label.style.color = noteColor(DEMO_NOTES[zone]); } })
+            .fromTo(`.demo-zone:nth-child(${zone + 1})`, { opacity: 0.45 }, { opacity: 1, duration: 0.25, yoyo: true, repeat: 1 }, "<")
+            .to(".demo-ring", { scale: 1, duration: 0.3, ease: "elastic.out(1, 0.5)" }, ">0.15")
+            .to({}, { duration: 0.25 });
+        });
+        gsap.utils.toArray<HTMLElement>(".eq i").forEach((bar, index) => {
+          gsap.fromTo(bar, { scaleY: 0.15 }, { scaleY: () => gsap.utils.random(0.35, 1), duration: gsap.utils.random(0.35, 0.8), repeat: -1, yoyo: true, ease: "sine.inOut", delay: index * 0.03 });
+        });
+        gsap.from(".demo", { opacity: 0, y: 60, scale: 0.96, duration: 1, ease: "power3.out", scrollTrigger: { trigger: ".demo", start: "top 88%" } });
+
+        // Revelação ao rolar
+        gsap.utils.toArray<HTMLElement>(".reveal").forEach((element) => {
+          gsap.from(element, { opacity: 0, y: 40, duration: 0.9, ease: "power3.out", scrollTrigger: { trigger: element, start: "top 86%" } });
+        });
+        gsap.from(".feature", { opacity: 0, y: 60, rotateX: -10, transformPerspective: 800, duration: 0.9, stagger: 0.15, ease: "power3.out", scrollTrigger: { trigger: ".feature-grid", start: "top 82%" } });
+        gsap.from(".step", { opacity: 0, x: -30, duration: 0.8, stagger: 0.15, ease: "power3.out", scrollTrigger: { trigger: ".step-row", start: "top 85%" } });
+
+        // Números que contam
+        gsap.utils.toArray<HTMLElement>(".stat-row b").forEach((element) => {
+          const target = Number(element.dataset.count ?? 0);
+          const counter = { value: 0 };
+          gsap.to(counter, {
+            value: target, duration: 1.6, ease: "power2.out",
+            scrollTrigger: { trigger: element, start: "top 90%" },
+            onUpdate: () => { element.textContent = String(Math.round(counter.value)); }
+          });
+        });
+
+        // Pipeline acende em sequência conforme a rolagem
+        gsap.from(".pipeline li", {
+          opacity: 0.15, y: 30, scale: 0.97, stagger: 0.25, ease: "none",
+          scrollTrigger: { trigger: ".pipeline", start: "top 80%", end: "bottom 65%", scrub: true }
+        });
+        gsap.fromTo(".pipe-progress i", { scaleX: 0 }, {
+          scaleX: 1, ease: "none", transformOrigin: "0 50%",
+          scrollTrigger: { trigger: ".pipeline", start: "top 80%", end: "bottom 65%", scrub: true }
+        });
+
+        // Chamada final
+        gsap.from(".final-cta > *", { opacity: 0, y: 40, duration: 0.8, stagger: 0.12, ease: "power3.out", scrollTrigger: { trigger: ".final-cta", start: "top 80%" } });
+        gsap.to(".final-cta .btn.primary", { boxShadow: "0 0 50px rgba(139,124,255,.7)", duration: 1.3, yoyo: true, repeat: -1, ease: "sine.inOut" });
+
+        // Barra de navegação ganha corpo ao rolar
+        gsap.to(".landing-nav", { backgroundColor: "rgba(13,11,24,.88)", scrollTrigger: { start: 40, end: 160, scrub: true } });
+      });
+
+      return () => mm.revert();
+    }, rootRef);
+    return () => ctx.revert();
+    // A animação é montada de novo quando o idioma muda, porque o texto dos elementos muda.
+  }, [lang]);
+
+  return <div className="landing" ref={rootRef} key={lang}>
     <div className="atmosphere" aria-hidden="true"><div className="aura aura-one" /><div className="aura aura-two" /></div>
 
     <header className="landing-nav glass">
       <Wordmark href="#/sobre" />
       <nav>
-        <button type="button" onClick={() => scrollTo("ideia")}>A ideia</button>
-        <button type="button" onClick={() => scrollTo("engine")}>Engine</button>
-        <a className="btn primary" href="#/">Abrir o instrumento</a>
+        <button type="button" onClick={() => scrollTo("ideia")}>{t("land.ideia")}</button>
+        <button type="button" onClick={() => scrollTo("engine")}>{t("land.engine")}</button>
+        <LangSwitch />
+        <a className="btn primary" href="#/">{t("land.open")}</a>
       </nav>
     </header>
 
     <section className="landing-hero">
       <LogoMark size={92} />
       <span className="eyebrow">MELODYCAM</span>
-      <h1>Música ambient com as <span>suas mãos</span></h1>
-      <p>Um instrumento que roda no navegador. Mostre as mãos à câmera, troque acordes com os dedos e faça sons de dark ambient, synthwave e dreamscape no ar, sem instalar nada.</p>
+      <h1 aria-label={t("land.h1aria")}>
+        {headline.map((word, index) => <span className="wl" key={`${word}-${index}`} aria-hidden="true"><span className={`w ${index >= headline.length - 2 ? "grad" : ""}`}>{word}</span></span>)}
+      </h1>
+      <p className="lead">{t("land.lead")}</p>
       <div className="landing-cta">
-        <a className="btn primary large" href="#/">Tocar agora</a>
-        <button type="button" className="btn ghost large" onClick={() => scrollTo("engine")}>Ver a engine</button>
+        <a className="btn primary large" href="#/">{t("land.play")}</a>
+        <button type="button" className="btn ghost large" onClick={() => scrollTo("ideia")}>{t("land.how")}</button>
       </div>
-      <div className="spectrum" aria-label="As sete notas e suas cores">
+      <div className="perks">{perks.map((perk) => <span key={perk}>{perk}</span>)}</div>
+      <div className="spectrum" aria-label={t("land.spectrumAria")}>
         {SPECTRUM.map((midi) => <span key={midi} style={{ background: noteColor(midi) }}>{solfege(midi)}</span>)}
       </div>
     </section>
 
-    <section id="ideia" className="landing-section">
-      <div className="section-head"><span className="eyebrow">01 A IDEIA</span><h2>Luz é som. Cada nota tem a sua cor.</h2>
-        <p>O Melodycam parte de um vídeo em que alguém toca acordes no ar com as mãos. A ideia aqui é fazer isso simples para qualquer pessoa: as sete notas viram sete cores, e a mesma cor aparece no teclado, nas faixas sobre a câmera e nas suas mãos.</p></div>
-      <div className="feature-grid">{FEATURES.map((item) => <article key={item.title} className="feature glass" style={{ "--note": item.color } as React.CSSProperties}>
-        <span className="feature-dot" /><h3>{item.title}</h3><p>{item.text}</p></article>)}</div>
-      <div className="step-row">{STEPS.map((step) => <div key={step.n} className="step"><span>{step.n}</span><strong>{step.title}</strong><p>{step.text}</p></div>)}</div>
-      <div className="stat-row">
-        <div><b>{PROGRESSIONS.length}</b><span>progressões de acordes</span></div>
-        <div><b>{PRESETS.length}</b><span>timbres</span></div>
-        <div><b>{SONGS.length}</b><span>melodias na biblioteca</span></div>
-        <div><b>0</b><span>vídeos enviados a servidores</span></div>
+    <section className="demo-section" aria-label="Demo">
+      <div className="demo glass" role="img" aria-label={t("land.demoAria")}>
+        <div className="demo-zones">
+          {DEMO_NOTES.map((midi) => <div key={midi} className="demo-zone" style={{ "--note": noteColor(midi) } as React.CSSProperties}><span>{solfege(midi)}</span></div>)}
+          <div className="demo-ring" />
+        </div>
+        <div className="demo-readout"><span>{t("land.note")}</span><b className="demo-note">{solfege(60)}</b></div>
+        <div className="eq" aria-hidden="true">{Array.from({ length: 36 }, (_, index) => <i key={index} style={{ background: noteColor(60 + (index % 8)) }} />)}</div>
       </div>
     </section>
 
+    <section id="ideia" className="landing-section">
+      <div className="section-head reveal"><span className="eyebrow">{t("land.s1eyebrow")}</span><h2>{t("land.s1title")}</h2><p>{t("land.s1p")}</p></div>
+      <div className="feature-grid">{features.map((item) => <article key={item.title} className="feature glass" style={{ "--note": item.color } as React.CSSProperties}>
+        <span className="feature-dot" /><h3>{item.title}</h3><p>{item.text}</p></article>)}</div>
+      <div className="step-row">{steps.map((step) => <div key={step.n} className="step"><span>{step.n}</span><strong>{step.title}</strong><p>{step.text}</p></div>)}</div>
+      <div className="stat-row">{stats.map((stat) => <div key={stat.label}><b data-count={stat.value}>0</b><span>{stat.label}</span></div>)}</div>
+    </section>
+
     <section id="engine" className="landing-section">
-      <div className="section-head"><span className="eyebrow">02 ENGINE</span><h2>Do quadro da câmera ao som, em tempo real.</h2>
-        <p>Tudo acontece no seu navegador. O vídeo nunca sai do dispositivo: a câmera alimenta o modelo de mãos, os gestos viram notas e o som é sintetizado na hora.</p></div>
-      <ol className="pipeline">{PIPELINE.map((item, index) => <li key={item.title} className="glass">
+      <div className="section-head reveal"><span className="eyebrow">{t("land.s2eyebrow")}</span><h2>{t("land.s2title")}</h2><p>{t("land.s2p")}</p></div>
+      <div className="pipe-progress" aria-hidden="true"><i /></div>
+      <ol className="pipeline">{pipeline.map((item, index) => <li key={item.title} className="glass">
         <span className="pipe-n">{String(index + 1).padStart(2, "0")}</span><h3>{item.title}</h3><p>{item.detail}</p></li>)}</ol>
-      <div className="stack-row">
-        {["React 19", "TypeScript", "Vite", "MediaPipe Tasks Vision", "Web Audio API", "Canvas 2D"].map((name) => <span key={name} className="chip">{name}</span>)}
+      <div className="stack-row reveal">
+        {["React 19", "TypeScript", "Vite", "GSAP", "MediaPipe Tasks Vision", "Web Audio API", "Canvas 2D"].map((name) => <span key={name} className="chip">{name}</span>)}
       </div>
+    </section>
+
+    <section className="final-cta">
+      <h2>{t("land.ctaTitle")}</h2>
+      <p>{t("land.ctaP")}</p>
+      <a className="btn primary large" href="#/">{t("land.open")}</a>
     </section>
 
     <footer className="landing-footer">
       <div className="credit">
         <LogoMark size={40} />
         <div>
-          <strong>Desenvolvido por Matheus Assunção da Cunha</strong>
-          <span>Projeto de código aberto.</span>
+          <strong>{t("land.by")}</strong>
+          <span>{t("land.openSource")}</span>
         </div>
       </div>
       <div className="footer-links">
-        <a className="btn ghost" href={GITHUB_PROFILE} target="_blank" rel="noreferrer">GitHub do Matheus</a>
-        <a className="btn ghost" href={GITHUB_REPO} target="_blank" rel="noreferrer">Repositório</a>
-        <a className="btn primary" href="#/">Abrir o instrumento</a>
+        <a className="btn ghost" href={GITHUB_PROFILE} target="_blank" rel="noreferrer">{t("land.github")}</a>
+        <a className="btn ghost" href={GITHUB_REPO} target="_blank" rel="noreferrer">{t("land.repo")}</a>
+        <a className="btn primary" href="#/">{t("land.open")}</a>
       </div>
     </footer>
   </div>;

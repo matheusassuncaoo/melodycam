@@ -18,7 +18,7 @@ export function LogoMark({ size = 32, title = "Melodycam" }: { size?: number; ti
       </linearGradient>
     </defs>
     <circle cx="32" cy="32" r="28" fill="none" stroke="url(#mc-ring)" strokeWidth="3" />
-    {BARS.map((bar) => <rect key={bar.x} x={bar.x} y={bar.top} width="4.4" height={47 - bar.top} rx="2.2" fill={noteColor(bar.midi)} />)}
+    {BARS.map((bar) => <rect className="bar" key={bar.x} x={bar.x} y={bar.top} width="4.4" height={47 - bar.top} rx="2.2" fill={noteColor(bar.midi)} />)}
   </svg>;
 }
 

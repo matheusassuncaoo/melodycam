@@ -1,8 +1,10 @@
 import { FilesetResolver, HandLandmarker, type NormalizedLandmark } from "@mediapipe/tasks-vision";
 
-const LOCAL_MODEL = "/models/hand_landmarker.task";
+// BASE_URL termina em "/": "/" em desenvolvimento e "/<repositório>/" no GitHub Pages.
+const BASE = import.meta.env.BASE_URL;
+const LOCAL_MODEL = `${BASE}models/hand_landmarker.task`;
 const REMOTE_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
-const WASM_URL = "/mediapipe";
+const WASM_URL = `${BASE}mediapipe`;
 
 export async function createHandLandmarker(): Promise<{ landmarker: HandLandmarker; delegate: "GPU" | "CPU" }> {
   const vision = await FilesetResolver.forVisionTasks(WASM_URL);
@@ -58,6 +60,13 @@ export type ZoneOverlay = {
   active: number;
   colors: string[];
   labels: string[];
+  /** "x": faixas lado a lado. "y": faixas empilhadas (min/max na altura; a faixa 0 fica embaixo). */
+  axis?: "x" | "y";
+  /** Para axis "y": extensão horizontal das faixas (0..1). */
+  crossMin?: number;
+  crossMax?: number;
+  /** Faixa que a música espera agora (contorno tracejado). */
+  expected?: number;
 };
 
 export const ROLE_COLORS = { select: "#ffd166", play: "#5fe3e0", idle: "#ffffff" } as const;
@@ -89,24 +98,62 @@ export function drawOverlay(
   };
 
   if (zones) {
-    const compact = W <= 900;
-    const top = H * (compact ? 0.28 : 0.4);
-    const bottom = H * (compact ? 0.6 : 0.8);
-    const bandW = ((zones.max - zones.min) * W) / zones.count;
-    for (let i = 0; i < zones.count; i++) {
-      const x = zones.min * W + i * bandW;
-      const color = zones.colors[i];
-      const active = i === zones.active;
-      const gradient = ctx.createLinearGradient(0, top, 0, bottom);
-      gradient.addColorStop(0, color + (active ? "55" : "1a"));
-      gradient.addColorStop(1, color + "00");
-      ctx.fillStyle = gradient;
-      ctx.fillRect(x + 2, top, bandW - 4, bottom - top);
-      ctx.fillStyle = color + (active ? "ff" : "99");
-      ctx.fillRect(x + 2, top, bandW - 4, active ? 4 : 2);
-      ctx.font = `${active ? 700 : 600} ${Math.min(18, bandW * 0.3)}px Manrope, system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText(zones.labels[i], x + bandW / 2, top + 24);
+    const axis = zones.axis ?? "x";
+    const mark = (x: number, y: number, w: number, hgt: number, index: number) => {
+      if (index !== zones.expected) return;
+      ctx.save();
+      ctx.setLineDash([8, 6]);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#ffffffdd";
+      ctx.strokeRect(x + 3, y + 3, w - 6, hgt - 6);
+      ctx.restore();
+    };
+    if (axis === "x") {
+      const compact = W <= 900;
+      const top = H * (compact ? 0.2 : 0.4);
+      const bottom = H * (compact ? 0.56 : 0.8);
+      const bandW = ((zones.max - zones.min) * W) / zones.count;
+      for (let i = 0; i < zones.count; i++) {
+        const x = zones.min * W + i * bandW;
+        const color = zones.colors[i];
+        const active = i === zones.active;
+        const gradient = ctx.createLinearGradient(0, top, 0, bottom);
+        gradient.addColorStop(0, color + (active ? "55" : "1a"));
+        gradient.addColorStop(1, color + "00");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x + 2, top, bandW - 4, bottom - top);
+        ctx.fillStyle = color + (active ? "ff" : "99");
+        ctx.fillRect(x + 2, top, bandW - 4, active ? 4 : 2);
+        ctx.font = `${active ? 700 : 600} ${Math.min(18, bandW * 0.3)}px Manrope, system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText(zones.labels[i], x + bandW / 2, top + 24);
+        mark(x, top, bandW, bottom - top, i);
+      }
+    } else {
+      const left = (zones.crossMin ?? 0.19) * W;
+      const right = (zones.crossMax ?? 0.81) * W;
+      const top = zones.min * H;
+      const bottom = zones.max * H;
+      const bandH = (bottom - top) / zones.count;
+      for (let i = 0; i < zones.count; i++) {
+        const y = bottom - (i + 1) * bandH;
+        const color = zones.colors[i];
+        const active = i === zones.active;
+        const gradient = ctx.createLinearGradient(left, 0, right, 0);
+        gradient.addColorStop(0, color + (active ? "66" : "22"));
+        gradient.addColorStop(1, color + "00");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(left, y + 2, right - left, bandH - 4);
+        ctx.fillStyle = color + (active ? "ff" : "99");
+        ctx.fillRect(left, y + 2, active ? 6 : 3, bandH - 4);
+        ctx.font = `${active ? 800 : 600} ${Math.max(11, Math.min(20, bandH * 0.5))}px Manrope, system-ui, sans-serif`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = active ? "#ffffff" : color;
+        ctx.fillText(zones.labels[i], left + 16, y + bandH / 2);
+        ctx.textBaseline = "alphabetic";
+        mark(left, y, right - left, bandH, i);
+      }
     }
   }
 

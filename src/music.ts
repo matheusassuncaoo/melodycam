@@ -1,4 +1,5 @@
 import { midiFrequency } from "./notes";
+import { t, type L } from "./i18n";
 
 export type RecordedEvent = {
   type: "chord" | "note";
@@ -20,8 +21,8 @@ export type Project = {
 
 export type SoundPreset = {
   id: string;
-  name: string;
-  mood: string;
+  name: L;
+  mood: L;
   wave: OscillatorType;
   attack: number;
   /** Tempo (s) para cair até o nível de sustentação. */
@@ -41,19 +42,20 @@ export type SoundPreset = {
 };
 
 export const PRESETS: SoundPreset[] = [
-  { id: "abyss", name: "Abismo", mood: "pad dark ambient", wave: "sawtooth", attack: 0.9, decay: 1.2, sustain: 0.85, release: 3.4, cutoff: 650, echo: 0.5, space: 0.88 },
-  { id: "synthwave", name: "Synthwave", mood: "neon e retrô", wave: "sawtooth", unison: 5, spread: 16, attack: 0.05, decay: 1.4, sustain: 0.72, release: 1.5, cutoff: 2600, echo: 0.42, space: 0.55 },
-  { id: "dream", name: "Dreamscape", mood: "sonho e brilho", wave: "triangle", unison: 3, spread: 9, shimmer: 0.38, attack: 0.5, decay: 1.6, sustain: 0.7, release: 2.8, cutoff: 3400, echo: 0.55, space: 0.86 },
-  { id: "mist", name: "Névoa", mood: "pad aberto e frio", wave: "triangle", attack: 0.7, decay: 1, sustain: 0.85, release: 3, cutoff: 1300, echo: 0.42, space: 0.8 },
-  { id: "piano", name: "Piano", mood: "claro e direto", wave: "triangle", attack: 0.006, decay: 1.6, sustain: 0.28, release: 0.45, cutoff: 5200, echo: 0.1, space: 0.22 },
-  { id: "bell", name: "Sino", mood: "cristalino", wave: "sine", attack: 0.004, decay: 2.4, sustain: 0.05, release: 1.2, cutoff: 7000, echo: 0.3, space: 0.45 },
-  { id: "glow", name: "Glow", mood: "brilho etéreo", wave: "triangle", attack: 0.05, decay: 0.8, sustain: 0.8, release: 1.1, cutoff: 3600, echo: 0.34, space: 0.5 },
-  { id: "haze", name: "Haze", mood: "névoa e textura", wave: "sawtooth", attack: 0.12, decay: 0.8, sustain: 0.7, release: 1.4, cutoff: 1500, echo: 0.26, space: 0.6 },
-  { id: "drift", name: "Drift", mood: "pulsos no espaço", wave: "sine", attack: 0.03, decay: 0.6, sustain: 0.65, release: 1.0, cutoff: 2400, echo: 0.6, space: 0.45 },
-  { id: "void", name: "Void", mood: "escuro e profundo", wave: "sine", attack: 0.18, decay: 0.5, sustain: 0.9, release: 2.2, cutoff: 1100, echo: 0.36, space: 0.72 }
+  { id: "abyss", name: { pt: "Abismo", en: "Abyss" }, mood: { pt: "pad dark ambient", en: "dark ambient pad" }, wave: "sawtooth", attack: 0.9, decay: 1.2, sustain: 0.85, release: 3.4, cutoff: 650, echo: 0.38, space: 0.88 },
+  { id: "synthwave", name: "Synthwave", mood: { pt: "neon e retrô", en: "neon and retro" }, wave: "sawtooth", unison: 5, spread: 16, attack: 0.05, decay: 1.4, sustain: 0.72, release: 1.5, cutoff: 2600, echo: 0.42, space: 0.55 },
+  { id: "dream", name: "Dreamscape", mood: { pt: "sonho e brilho", en: "dream and shimmer" }, wave: "triangle", unison: 3, spread: 9, shimmer: 0.38, attack: 0.5, decay: 1.6, sustain: 0.7, release: 2.8, cutoff: 3400, echo: 0.4, space: 0.86 },
+  { id: "mist", name: { pt: "Névoa", en: "Mist" }, mood: { pt: "pad aberto e frio", en: "open, cold pad" }, wave: "triangle", attack: 0.7, decay: 1, sustain: 0.85, release: 3, cutoff: 1300, echo: 0.42, space: 0.8 },
+  { id: "piano", name: "Piano", mood: { pt: "claro e direto", en: "clear and direct" }, wave: "triangle", attack: 0.006, decay: 1.6, sustain: 0.28, release: 0.45, cutoff: 5200, echo: 0.1, space: 0.22 },
+  { id: "bell", name: { pt: "Sino", en: "Bell" }, mood: { pt: "cristalino", en: "crystalline" }, wave: "sine", attack: 0.004, decay: 2.4, sustain: 0.05, release: 1.2, cutoff: 7000, echo: 0.3, space: 0.45 },
+  { id: "glow", name: "Glow", mood: { pt: "brilho etéreo", en: "ethereal glow" }, wave: "triangle", attack: 0.05, decay: 0.8, sustain: 0.8, release: 1.1, cutoff: 3600, echo: 0.34, space: 0.5 },
+  { id: "haze", name: "Haze", mood: { pt: "névoa e textura", en: "haze and texture" }, wave: "sawtooth", attack: 0.12, decay: 0.8, sustain: 0.7, release: 1.4, cutoff: 1500, echo: 0.26, space: 0.6 },
+  { id: "drift", name: "Drift", mood: { pt: "pulsos no espaço", en: "pulses in space" }, wave: "sine", attack: 0.03, decay: 0.6, sustain: 0.65, release: 1.0, cutoff: 2400, echo: 0.45, space: 0.45 },
+  { id: "void", name: "Void", mood: { pt: "escuro e profundo", en: "dark and deep" }, wave: "sine", attack: 0.18, decay: 0.5, sustain: 0.9, release: 2.2, cutoff: 1100, echo: 0.36, space: 0.72 }
 ];
 
-type Voice = { oscillators: OscillatorNode[]; gains: GainNode[] };
+type VoiceOsc = { osc: OscillatorNode; semitones: number };
+type Voice = { groups: VoiceOsc[][]; gains: GainNode[]; notes: number[] };
 
 export class Synth {
   private context: AudioContext | null = null;
@@ -62,6 +64,7 @@ export class Synth {
   private filter: BiquadFilterNode | null = null;
   private echoWet: GainNode | null = null;
   private spaceWet: GainNode | null = null;
+  private glide = 0.45;
   private preset: SoundPreset = PRESETS[0];
   private echo = PRESETS[0].echo;
   private space = PRESETS[0].space;
@@ -88,14 +91,17 @@ export class Synth {
       master.connect(limiter).connect(analyser).connect(context.destination);
 
       const delay = context.createDelay(2);
-      delay.delayTime.value = 0.36;
+      delay.delayTime.value = 0.42;
       const feedback = context.createGain();
-      feedback.gain.value = 0.34;
+      feedback.gain.value = 0.3;
+      const damp = context.createBiquadFilter();
+      damp.type = "lowpass";
+      damp.frequency.value = 1500;
       const echoWet = context.createGain();
-      echoWet.gain.value = this.echo * 0.42;
+      echoWet.gain.value = this.echo * 0.7;
       this.echoWet = echoWet;
       filter.connect(delay);
-      delay.connect(feedback).connect(delay);
+      delay.connect(feedback).connect(damp).connect(delay);
       delay.connect(echoWet).connect(master);
 
       const convolver = context.createConvolver();
@@ -107,7 +113,7 @@ export class Synth {
       }
       convolver.buffer = impulse;
       const spaceWet = context.createGain();
-      spaceWet.gain.value = this.space * 0.5;
+      spaceWet.gain.value = this.space * 1.5;
       this.spaceWet = spaceWet;
       filter.connect(convolver).connect(spaceWet).connect(master);
     }
@@ -131,8 +137,8 @@ export class Synth {
     this.echo = echo;
     this.space = space;
     if (!this.context) return;
-    this.echoWet?.gain.setTargetAtTime(echo * 0.42, this.context.currentTime, 0.05);
-    this.spaceWet?.gain.setTargetAtTime(space * 0.5, this.context.currentTime, 0.05);
+    this.echoWet?.gain.setTargetAtTime(echo * 0.7, this.context.currentTime, 0.05);
+    this.spaceWet?.gain.setTargetAtTime(space * 1.5, this.context.currentTime, 0.05);
   }
 
   getWaveform(): Uint8Array<ArrayBuffer> | null {
@@ -151,9 +157,10 @@ export class Synth {
     const unison = this.preset.unison ?? 2;
     const spread = this.preset.spread ?? 6;
     const peak = (0.13 * velocity * Math.sqrt(2 / unison)) / Math.sqrt(notes.length);
-    const oscillators: OscillatorNode[] = [];
+    const groups: VoiceOsc[][] = [];
     const gains: GainNode[] = [];
     for (const note of notes) {
+      const group: VoiceOsc[] = [];
       const gain = context.createGain();
       gain.gain.setValueAtTime(0, now);
       gain.gain.linearRampToValueAtTime(peak, now + attack);
@@ -166,7 +173,7 @@ export class Synth {
         oscillator.detune.value = unison === 2 ? (voice ? spread : 0) : (voice / (unison - 1) - 0.5) * 2 * spread;
         oscillator.connect(gain);
         oscillator.start(now);
-        oscillators.push(oscillator);
+        group.push({ osc: oscillator, semitones: 0 });
       }
       if (shimmer > 0) {
         const bell = context.createOscillator();
@@ -176,11 +183,34 @@ export class Synth {
         bellGain.gain.value = shimmer;
         bell.connect(bellGain).connect(gain);
         bell.start(now);
-        oscillators.push(bell);
+        group.push({ osc: bell, semitones: 12 });
       }
+      groups.push(group);
       gains.push(gain);
     }
-    this.voice = { oscillators, gains };
+    this.voice = { groups, gains, notes: [...notes] };
+  }
+
+  setGlide(seconds: number): void { this.glide = Math.max(0.03, seconds); }
+
+  /** Troca de acorde ou nota sem reataque: cada voz desliza para a nova altura (como um crossfade). */
+  glideTo(notes: number[]): boolean {
+    const context = this.context;
+    const voice = this.voice;
+    if (!context || !voice || notes.length !== voice.notes.length) return false;
+    const now = context.currentTime;
+    voice.groups.forEach((group, index) => {
+      for (const { osc, semitones } of group) {
+        const param = osc.frequency;
+        const from = param.value;
+        if (typeof param.cancelAndHoldAtTime === "function") param.cancelAndHoldAtTime(now);
+        else param.cancelScheduledValues(now);
+        param.setValueAtTime(from, now);
+        param.exponentialRampToValueAtTime(midiFrequency(notes[index] + semitones), now + this.glide);
+      }
+    });
+    voice.notes = [...notes];
+    return true;
   }
 
   stop(): void {
@@ -193,7 +223,7 @@ export class Synth {
       else param.cancelScheduledValues(now);
       param.setTargetAtTime(0, now, release / 5);
     }
-    for (const oscillator of this.voice.oscillators) oscillator.stop(now + release * 1.5);
+    for (const group of this.voice.groups) for (const { osc } of group) osc.stop(now + release * 1.5);
     this.voice = null;
   }
 
@@ -205,19 +235,19 @@ export class Synth {
 }
 
 export function validateProject(value: unknown): Project {
-  if (!value || typeof value !== "object") throw new Error("Arquivo de projeto inválido.");
+  if (!value || typeof value !== "object") throw new Error(t("err.projectInvalid"));
   const candidate = value as Partial<Project>;
   if (candidate.schemaVersion !== 1 || !["chords", "performance"].includes(candidate.mode ?? "") || !Array.isArray(candidate.events)) {
-    throw new Error("Formato de projeto não reconhecido.");
+    throw new Error(t("err.projectFormat"));
   }
-  if (candidate.events.length > 10000) throw new Error("O projeto tem eventos demais.");
+  if (candidate.events.length > 10000) throw new Error(t("err.projectBig"));
   for (const event of candidate.events) {
     if (!["chord", "note"].includes(event.type) || !Array.isArray(event.pitchesMidi) || event.pitchesMidi.length > 8 ||
       (event.type === "note" && event.pitchesMidi.length !== 1) ||
       !event.pitchesMidi.every((note) => Number.isInteger(note) && note >= 0 && note <= 127) ||
       !Number.isFinite(event.startBeat) || event.startBeat < 0 ||
       !Number.isFinite(event.durationBeats) || event.durationBeats <= 0 || event.durationBeats > 128) {
-      throw new Error("O projeto contém eventos inválidos.");
+      throw new Error(t("err.projectEvents"));
     }
   }
   return candidate as Project;
