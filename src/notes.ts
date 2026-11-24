@@ -56,11 +56,38 @@ export const OCTAVES = [
 
 export type Chord = { symbol: string; name: string; notes: number[]; fingers: number; degree: string; color: string };
 
-/** Progressão I–V–vi–IV (a mais usada na música pop) em dedos 1 a 4, mais o ii no dedo 5. */
-export const CHORDS: Chord[] = [
-  { symbol: "C", name: "Dó maior", degree: "I", notes: [48, 55, 60, 64], fingers: 1, color: noteColor(0) },
-  { symbol: "G", name: "Sol maior", degree: "V", notes: [43, 55, 59, 62], fingers: 2, color: noteColor(7) },
-  { symbol: "Am", name: "Lá menor", degree: "vi", notes: [45, 57, 60, 64], fingers: 3, color: noteColor(9) },
-  { symbol: "F", name: "Fá maior", degree: "IV", notes: [41, 53, 57, 60], fingers: 4, color: noteColor(5) },
-  { symbol: "Dm", name: "Ré menor", degree: "ii", notes: [50, 53, 57, 62], fingers: 5, color: noteColor(2) }
+const ROOTS: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const ROOT_NAMES: Record<string, string> = { C: "Dó", D: "Ré", E: "Mi", F: "Fá", G: "Sol", A: "Lá", B: "Si" };
+
+/** Monta um acorde em pad largo e grave (raiz, oitava, terça e quinta abertas), pensado para ambient. */
+export function makeChord(symbol: string, fingers: number): Chord {
+  const match = /^([A-G])([#b]?)(m?)$/.exec(symbol);
+  if (!match) throw new Error(`Acorde inválido: ${symbol}`);
+  const [, letter, accidental, minor] = match;
+  const pitchClass = (ROOTS[letter] + (accidental === "#" ? 1 : accidental === "b" ? -1 : 0) + 12) % 12;
+  const root = 36 + pitchClass;
+  const third = minor ? 3 : 4;
+  return {
+    symbol,
+    name: `${ROOT_NAMES[letter]}${accidental === "#" ? "♯" : accidental === "b" ? "♭" : ""} ${minor ? "menor" : "maior"}`,
+    notes: [root, root + 12, root + 12 + third, root + 19, root + 24 + third],
+    fingers,
+    degree: "",
+    color: noteColor(pitchClass)
+  };
+}
+
+export type Progression = { id: string; title: string; subtitle: string; chords: Chord[] };
+
+const progression = (id: string, title: string, subtitle: string, symbols: string[]): Progression =>
+  ({ id, title, subtitle, chords: symbols.map((symbol, index) => makeChord(symbol, index + 1)) });
+
+/** Dedo 1 = primeiro acorde, dedo 2 = segundo, e assim por diante. */
+export const PROGRESSIONS: Progression[] = [
+  progression("creep", "Creep", "Radiohead · G B C Cm", ["G", "B", "C", "Cm"]),
+  progression("sombra", "Sombra", "Am F C G", ["Am", "F", "C", "G"]),
+  progression("nevoa", "Névoa", "Em C G D", ["Em", "C", "G", "D"]),
+  progression("abismo", "Abismo", "Dm B♭ F C", ["Dm", "Bb", "F", "C"]),
+  progression("eco", "Eco", "Cm A♭ E♭ B♭", ["Cm", "Ab", "Eb", "Bb"]),
+  progression("pop", "Luz", "C G Am F Dm", ["C", "G", "Am", "F", "Dm"])
 ];

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { HandLandmarker, NormalizedLandmark } from "@mediapipe/tasks-vision";
 import { PRESETS, Synth, validateProject, type Project, type RecordedEvent } from "./music";
-import { CHORDS, MAJOR_SCALE, OCTAVES, noteColor, noteLabel, solfege } from "./notes";
+import { PROGRESSIONS, MAJOR_SCALE, OCTAVES, noteColor, noteLabel, solfege } from "./notes";
 import { SONGS, songRange } from "./songs";
 import { PinchDetector, VoteFilter, ZoneSelector, pinchRatio, readFingers, type Point } from "./gestures";
 import { ROLE_COLORS, createHandLandmarker, drawOverlay, frameToScreen, type DrawHand } from "./hands";
@@ -21,9 +21,40 @@ type Target = { notes: number[]; label: string; type: "chord" | "note"; zone?: n
 
 type FrameHand = { points: NormalizedLandmark[]; world: Point[]; sx: number; pinchAt: { x: number; y: number } };
 
+/** Tenta resoluções do melhor para o mais simples; "Failed to allocate videosource" costuma ser câmera ocupada, então repete uma vez. */
+async function openCamera(): Promise<MediaStream> {
+  const attempts: MediaStreamConstraints[] = [
+    { video: { facingMode: "user", width: { ideal: 960 }, height: { ideal: 540 } }, audio: false },
+    { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+    { video: true, audio: false }
+  ];
+  let lastError: unknown;
+  for (let round = 0; round < 2; round++) {
+    for (const constraints of attempts) {
+      try { return await navigator.mediaDevices.getUserMedia(constraints); } catch (error) {
+        lastError = error;
+        if (error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "NotFoundError")) throw error;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 700));
+  }
+  throw lastError;
+}
+
+function cameraErrorText(error: unknown): string {
+  const name = error instanceof DOMException ? error.name : "";
+  if (name === "NotReadableError" || (error instanceof Error && /videosource|allocate/i.test(error.message))) {
+    return "A câmera parece estar em uso por outro programa (Zoom, OBS, Teams, outra aba ou app de câmera). Feche-o e tente de novo.";
+  }
+  if (name === "NotAllowedError") return "O acesso à câmera foi negado. Libere a permissão no cadeado da barra de endereço.";
+  if (name === "NotFoundError") return "Nenhuma câmera foi encontrada neste computador.";
+  return error instanceof Error ? error.message : "Erro desconhecido.";
+}
+
 function App() {
   const [mode, setMode] = useState<Mode>("chords");
   const [chord, setChord] = useState(0);
+  const [progIndex, setProgIndex] = useState(0);
   const [octave, setOctave] = useState(1);
   const [zone, setZone] = useState(0);
   const [songIndex, setSongIndex] = useState(1);
@@ -63,6 +94,7 @@ function App() {
   const zoneSelectorRef = useRef(new ZoneSelector(8, ZONE_MIN, ZONE_MAX));
   const modeRef = useRef<Mode>("chords");
   const chordRef = useRef(0);
+  const progRef = useRef(0);
   const octaveRef = useRef(1);
   const zoneRef = useRef(0);
   const songIndexRef = useRef(1);
@@ -88,6 +120,7 @@ function App() {
   useEffect(() => { swapRef.current = swapHands; }, [swapHands]);
   useEffect(() => { pinchDetectorRef.current.setSensitivity(sensitivity); }, [sensitivity]);
 
+  const chords = PROGRESSIONS[progIndex].chords;
   const song = SONGS[songIndex];
   const octaveBase = OCTAVES[octave].base;
   const zoneMidis = useMemo(() => MAJOR_SCALE.map((step) => octaveBase + step), [octaveBase]);
@@ -98,9 +131,29 @@ function App() {
     modeRef.current = next;
     setMode(next);
     pinchRef.current = false;
+    synthRef.current.setBrightness(0.4333);
+    const padPreset = presetIndex <= 1;
+    if (next === "chords" && !padPreset) choosePreset(0);
+    if (next !== "chords" && padPreset) choosePreset(PRESETS.findIndex((item) => item.id === "piano"));
     setStatus(next === "chords" ? "Mão esquerda escolhe, direita toca" : next === "notes" ? "Deslize a mão e junte os dedos" : "Junte os dedos para tocar a próxima nota");
   };
-  const pickChord = (index: number) => { chordRef.current = index; setChord(index); };
+  const pickChord = (index: number) => {
+    chordRef.current = index;
+    setChord(index);
+    // Troca ao vivo: com o pad soando, o novo acorde entra e o anterior se dissolve.
+    if (playingRef.current && modeRef.current === "chords") {
+      const input = cameraRef.current ? "camera" : "manual";
+      stopSound();
+      startSound(input);
+    }
+  };
+  const pickProgression = (index: number) => {
+    stopSound();
+    progRef.current = index;
+    chordRef.current = 0;
+    setProgIndex(index);
+    setChord(0);
+  };
   const pickOctave = (index: number) => { octaveRef.current = index; setOctave(index); };
   const pickSong = (index: number) => { stopSound(); stopDemo(); songIndexRef.current = index; songPosRef.current = 0; setSongIndex(index); setSongPos(0); };
   const restartSong = () => { stopDemo(); songPosRef.current = 0; setSongPos(0); };
@@ -178,7 +231,7 @@ function App() {
 
   const resolveTarget = useCallback((): Target => {
     if (modeRef.current === "chords") {
-      const picked = CHORDS[chordRef.current];
+      const picked = PROGRESSIONS[progRef.current].chords[chordRef.current];
       return { notes: picked.notes, label: picked.symbol, type: "chord" };
     }
     if (modeRef.current === "notes") {
@@ -275,7 +328,7 @@ function App() {
       const stable = fingerVoteRef.current.update(count);
       selectorBadge = String(stable);
       setFingers((previous) => previous === stable ? previous : stable);
-      if (currentMode === "chords" && stable >= 1 && stable <= CHORDS.length && stable - 1 !== chordRef.current) pickChord(stable - 1);
+      if (currentMode === "chords" && stable >= 1 && stable <= PROGRESSIONS[progRef.current].chords.length && stable - 1 !== chordRef.current) pickChord(stable - 1);
       if (currentMode === "notes" && stable >= 1 && stable <= OCTAVES.length && stable - 1 !== octaveRef.current) pickOctave(stable - 1);
     }
 
@@ -286,6 +339,7 @@ function App() {
       pinching = pinchDetectorRef.current.update(ratio);
       const meter = Math.round(Math.max(0, Math.min(1, 1 - ratio / 0.9)) * 20) * 5;
       setPinch((previous) => previous === meter ? previous : meter);
+      if (currentMode === "chords") synthRef.current.setBrightness(1 - player.pinchAt.y);
       if (currentMode === "notes") {
         const next = zoneSelectorRef.current.update(player.pinchAt.x);
         if (next !== zoneRef.current) { zoneRef.current = next; setZone(next); }
@@ -378,7 +432,7 @@ function App() {
         video.src = demo; video.loop = true; video.muted = true;
       } else {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("A câmera exige HTTPS ou localhost.");
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 60 } }, audio: false });
+        const stream = await openCamera();
         streamRef.current = stream;
         video.srcObject = stream;
       }
@@ -394,8 +448,7 @@ function App() {
       scheduleFrame();
     } catch (error) {
       stopCamera();
-      const detail = error instanceof Error ? error.message : "Erro desconhecido";
-      setMessage(`Não foi possível ativar a câmera. ${detail} Você ainda pode tocar pelo teclado em tela.`);
+      setMessage(`Não foi possível ativar a câmera. ${cameraErrorText(error)} Você ainda pode tocar pelos controles em tela.`);
     } finally { setLoading(false); }
   };
 
@@ -447,7 +500,7 @@ function App() {
       const row = KEY_ROW.indexOf(lower);
       if (row >= 0 && !event.metaKey && !event.ctrlKey) { playKey(OCTAVES[octaveRef.current].base + MAJOR_SCALE[row]); return; }
       const index = Number(event.key) - 1;
-      if (index >= 0 && index < CHORDS.length && modeRef.current === "chords") pickChord(index);
+      if (index >= 0 && index < PROGRESSIONS[progRef.current].chords.length && modeRef.current === "chords") pickChord(index);
     };
     const onKeyUp = (event: KeyboardEvent) => { if (event.code === "Space" || KEY_ROW.includes(event.key.toLowerCase())) stopSound(); };
     const onVisibility = () => { if (document.hidden) stopSound(); };
@@ -510,10 +563,10 @@ function App() {
     : { low: octaveBase, high: octaveBase + 12, showSharps: false };
   const next = mode === "song" ? upcoming.midi : undefined;
   const focusMidi = playing && lit.length === 1 ? lit[0] : mode === "notes" ? zoneMidis[zone] : upcoming.midi;
-  const nowColor = mode === "chords" ? CHORDS[chord].color : noteColor(focusMidi);
+  const nowColor = mode === "chords" ? chords[chord].color : noteColor(focusMidi);
   const nowCaption = mode === "chords" ? "ACORDE" : mode === "notes" ? "NOTA" : "PRÓXIMA NOTA";
-  const nowText = mode === "chords" ? CHORDS[chord].symbol : solfege(focusMidi);
-  const nowName = mode === "chords" ? CHORDS[chord].name : mode === "notes" ? `${OCTAVES[octave].name} · ${noteLabel(focusMidi)}` : song.title;
+  const nowText = mode === "chords" ? chords[chord].symbol : solfege(focusMidi);
+  const nowName = mode === "chords" ? chords[chord].name : mode === "notes" ? `${OCTAVES[octave].name} · ${noteLabel(focusMidi)}` : song.title;
   const ribbon = mode === "song" ? Array.from({ length: 8 }, (_, i) => ({ index: songPos + i, note: song.notes[(songPos + i) % song.notes.length], wrap: songPos + i >= song.notes.length })) : [];
 
   return <div className="studio">
@@ -544,9 +597,11 @@ function App() {
         </div>
 
         {mode === "chords" && <>
-          <div className="panel-heading"><span className="eyebrow">MÃO ESQUERDA</span><h2>Mostre de 1 a 5 dedos</h2></div>
-          <div className="chord-list">{CHORDS.map((item, index) => <button key={item.symbol} type="button" className={`chord-button ${chord === index ? "selected" : ""}`} style={{ "--note": item.color } as React.CSSProperties} onClick={() => pickChord(index)} aria-pressed={chord === index}>
-            <span className="finger-count">{item.fingers}</span><span className="chord-symbol">{item.symbol}</span><span className="chord-name">{item.name}</span><span className="degree">{item.degree}</span>
+          <div className="panel-heading"><span className="eyebrow">PROGRESSÃO</span><h2>Escolha a música</h2></div>
+          <div className="prog-grid">{PROGRESSIONS.map((item, index) => <button key={item.id} type="button" className={progIndex === index ? "selected" : ""} onClick={() => pickProgression(index)} aria-pressed={progIndex === index}><strong>{item.title}</strong><small>{item.subtitle}</small></button>)}</div>
+          <div className="panel-heading"><span className="eyebrow">MÃO ESQUERDA</span><h2>Mostre de 1 a {chords.length} dedos</h2><p>Segure a pinça com a direita: o pad sustenta e o acorde muda ao vivo. Subir a mão abre o brilho.</p></div>
+          <div className="chord-list">{chords.map((item, index) => <button key={item.symbol} type="button" className={`chord-button ${chord === index ? "selected" : ""}`} style={{ "--note": item.color } as React.CSSProperties} onClick={() => pickChord(index)} aria-pressed={chord === index}>
+            <span className="finger-count">{item.fingers}</span><span className="chord-symbol">{item.symbol}</span><span className="chord-name">{item.name}</span>
           </button>)}</div>
         </>}
 
@@ -568,8 +623,8 @@ function App() {
       <section className="stage" aria-label="Instrumento">
         {!cameraOn && <div className="hero">
           <LogoMark size={72} />
-          <h1>Música com as <span>suas mãos</span></h1>
-          <p>Sem instrumento, sem teoria. Mostre as mãos à câmera, escolha um acorde com os dedos e toque juntando polegar e indicador.</p>
+          <h1>Componha ambient com as <span>suas mãos</span></h1>
+          <p>Dark ambient sem instrumento: escolha o acorde com os dedos da esquerda e faça o pad soar juntando polegar e indicador da direita. Dá para tocar Creep.</p>
           <button type="button" className="btn primary large" onClick={startCamera} disabled={loading}>{loading ? "Preparando…" : "Ativar câmera"}</button>
           <small>Ou toque agora com o teclado em tela, as teclas A–K ou a barra de espaço.</small>
         </div>}

@@ -31,11 +31,11 @@ Para testar a detecção sem webcam, coloque um vídeo em `public/` e abra `/?de
 
 Três modos:
 
-- **Acordes:** a mão esquerda mostra de 1 a 5 dedos para escolher C, G, Am, F ou Dm; a direita toca juntando polegar e indicador.
+- **Acordes (ambient):** o modo principal. Escolha uma progressão (Creep: G B C Cm, Sombra, Névoa, Abismo, Eco, Luz). A mão esquerda mostra 1 a 4 dedos para escolher o acorde, e a direita segura a pinça para o pad dark ambient soar. Trocar de dedos muda o acorde ao vivo, e subir a mão direita abre o brilho do som. Novas progressões entram em `src/notes.ts`.
 - **Notas:** Dó Ré Mi Fá Sol Lá Si Dó. A tela se divide em 8 faixas coloridas; deslize a mão direita e junte os dedos. A mão esquerda com 1, 2 ou 3 dedos troca a oitava.
 - **Músicas:** biblioteca com oito melodias (Escala de Dó, Brilha Brilha Estrelinha, Ode à Alegria, Parabéns pra Você, Jingle Bells, Frère Jacques, Ao Luar e Para Elisa). Cada pinça toca a próxima nota, e "Ouvir" toca a melodia inteira. Novas melodias entram em `src/songs.ts`.
 
-Sem câmera, tudo funciona pelo teclado em tela, pelas teclas A–K ou pela barra de espaço. Há seis timbres (Piano, Sino, Glow, Haze, Drift, Void), eco, reverberação, osciloscópio, gravação e projetos em JSON.
+Sem câmera, tudo funciona pelo teclado em tela, pelas teclas A–K ou pela barra de espaço. Há oito timbres (Abismo e Névoa para pads ambient, além de Piano, Sino, Glow, Haze, Drift e Void), eco, reverberação, osciloscópio, gravação e projetos em JSON.
 
 ## Próximo marco
 

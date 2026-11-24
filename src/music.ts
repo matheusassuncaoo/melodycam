@@ -35,6 +35,8 @@ export type SoundPreset = {
 };
 
 export const PRESETS: SoundPreset[] = [
+  { id: "abyss", name: "Abismo", mood: "pad dark ambient", wave: "sawtooth", attack: 0.9, decay: 1.2, sustain: 0.85, release: 3.4, cutoff: 650, echo: 0.5, space: 0.88 },
+  { id: "mist", name: "Névoa", mood: "pad aberto e frio", wave: "triangle", attack: 0.7, decay: 1, sustain: 0.85, release: 3, cutoff: 1300, echo: 0.42, space: 0.8 },
   { id: "piano", name: "Piano", mood: "claro e direto", wave: "triangle", attack: 0.006, decay: 1.6, sustain: 0.28, release: 0.45, cutoff: 5200, echo: 0.1, space: 0.22 },
   { id: "bell", name: "Sino", mood: "cristalino", wave: "sine", attack: 0.004, decay: 2.4, sustain: 0.05, release: 1.2, cutoff: 7000, echo: 0.3, space: 0.45 },
   { id: "glow", name: "Glow", mood: "brilho etéreo", wave: "triangle", attack: 0.05, decay: 0.8, sustain: 0.8, release: 1.1, cutoff: 3600, echo: 0.34, space: 0.5 },
@@ -89,7 +91,7 @@ export class Synth {
       delay.connect(echoWet).connect(master);
 
       const convolver = context.createConvolver();
-      const length = Math.floor(context.sampleRate * 2.6);
+      const length = Math.floor(context.sampleRate * 4.2);
       const impulse = context.createBuffer(2, length, context.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const data = impulse.getChannelData(channel);
@@ -108,6 +110,13 @@ export class Synth {
     this.preset = preset;
     this.setEffects(preset.echo, preset.space);
     if (this.context) this.filter?.frequency.setTargetAtTime(preset.cutoff, this.context.currentTime, 0.05);
+  }
+
+  /** 0..1: abre ou fecha o filtro (brilho do pad) enquanto a mão sobe ou desce. */
+  setBrightness(value: number): void {
+    if (!this.context || !this.filter) return;
+    const factor = 0.35 + 1.5 * Math.max(0, Math.min(1, value));
+    this.filter.frequency.setTargetAtTime(this.preset.cutoff * factor, this.context.currentTime, 0.06);
   }
 
   setEffects(echo: number, space: number): void {
