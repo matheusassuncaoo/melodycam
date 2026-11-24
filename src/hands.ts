@@ -50,6 +50,8 @@ export type DrawHand = {
   pinchActive: boolean;
   /** Ponto (tela 0..1) entre polegar e indicador. */
   pinchAt: { x: number; y: number };
+  /** Centro da palma (tela 0..1): é ele que escolhe a faixa. */
+  anchor: { x: number; y: number };
   color: string;
 };
 
@@ -195,6 +197,18 @@ export function drawOverlay(
     }
 
     if (hand.role === "play") {
+      // Losango no centro da palma: mostra o que escolhe a faixa.
+      const palm = { x: hand.anchor.x * W, y: hand.anchor.y * H };
+      ctx.beginPath();
+      ctx.moveTo(palm.x, palm.y - 10); ctx.lineTo(palm.x + 10, palm.y); ctx.lineTo(palm.x, palm.y + 10); ctx.lineTo(palm.x - 10, palm.y);
+      ctx.closePath();
+      ctx.fillStyle = hand.color;
+      ctx.globalAlpha = 0.9;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#0b0a14";
+      ctx.stroke();
+      ctx.globalAlpha = 1;
       const at = { x: hand.pinchAt.x * W, y: hand.pinchAt.y * H };
       ctx.beginPath();
       ctx.arc(at.x, at.y, hand.pinchActive ? 22 : 15, 0, Math.PI * 2);

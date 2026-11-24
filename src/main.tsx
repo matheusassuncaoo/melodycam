@@ -20,7 +20,7 @@ const PINCH_STORAGE = "melodycam-pinch";
 /** Faixas laterais (notas em "Lados"): no desktop evitam os painéis; no celular usam a largura toda. */
 const zoneRange = () => window.innerWidth > 900 ? { min: 0.19, max: 0.81 } : { min: 0.06, max: 0.94 };
 /** Faixas verticais (partitura), como fração da altura da tela. */
-const yBand = () => window.innerWidth > 900 ? { top: 0.16, bottom: 0.8 } : { top: 0.18, bottom: 0.56 };
+const yBand = () => window.innerWidth > 900 ? { top: 0.12, bottom: 0.6 } : { top: 0.14, bottom: 0.48 };
 
 type Mode = "chords" | "notes" | "song";
 type ChordMethod = "height" | "fingers";
@@ -29,7 +29,7 @@ type SongStyle = "sequence" | "staff";
 type Target = { notes: number[]; label: string; type: "chord" | "note"; zone?: number; advance?: boolean };
 type Status = { key: Key; vars?: Record<string, string | number> };
 type Calib = "open" | "close" | "done" | "fail" | null;
-type FrameHand = { points: NormalizedLandmark[]; world: Point[]; sx: number; pinchAt: { x: number; y: number } };
+type FrameHand = { points: NormalizedLandmark[]; world: Point[]; sx: number; pinchAt: { x: number; y: number }; anchor: { x: number; y: number } };
 
 /** Tenta resoluções do melhor para o mais simples; "Failed to allocate videosource" costuma ser câmera ocupada, então repete uma vez. */
 async function openCamera(): Promise<MediaStream> {
@@ -112,10 +112,12 @@ function App() {
   const synthRef = useRef(new Synth());
   const fingerVoteRef = useRef(new VoteFilter(6, 4));
   const pinchDetectorRef = useRef(new PinchDetector());
-  const zoneSelectorRef = useRef(new ZoneSelector(8, 0, 1));
-  const chordZoneRef = useRef(new ZoneSelector(PROGRESSIONS[0].chords.length, 0, 1));
-  const songZoneRef = useRef(new ZoneSelector(staffPitches(SONGS[1]).length, 0, 1));
+  const zoneSelectorRef = useRef(new ZoneSelector(8, 0, 1, 0.3));
+  const chordZoneRef = useRef(new ZoneSelector(PROGRESSIONS[0].chords.length, 0, 1, 0.3));
+  const songZoneRef = useRef(new ZoneSelector(staffPitches(SONGS[1]).length, 0, 1, 0.3));
   const pinchEmaRef = useRef(new Ema(0.55));
+  const anchorXRef = useRef(new Ema(0.45));
+  const anchorYRef = useRef(new Ema(0.45));
   const workRef = useRef<HTMLCanvasElement | null>(null);
   const probeRef = useRef<HTMLCanvasElement | null>(null);
   const boostRef = useRef(1);
@@ -202,7 +204,7 @@ function App() {
     stopSound();
     progRef.current = index;
     chordRef.current = 0;
-    chordZoneRef.current = new ZoneSelector(PROGRESSIONS[index].chords.length, 0, 1);
+    chordZoneRef.current = new ZoneSelector(PROGRESSIONS[index].chords.length, 0, 1, 0.3);
     setProgIndex(index);
     setChord(0);
   };
@@ -213,7 +215,7 @@ function App() {
   const pickSong = (index: number) => {
     stopSound(); stopDemo();
     songIndexRef.current = index; songPosRef.current = 0;
-    songZoneRef.current = new ZoneSelector(staffPitches(SONGS[index]).length, 0, 1);
+    songZoneRef.current = new ZoneSelector(staffPitches(SONGS[index]).length, 0, 1, 0.3);
     setSongIndex(index); setSongPos(0);
   };
   const restartSong = () => { stopDemo(); songPosRef.current = 0; setSongPos(0); };
@@ -423,7 +425,9 @@ function App() {
       const wrist = frameToScreen(points[0], source, view);
       const pinchAt = frameToScreen({ x: (points[4].x + points[8].x) / 2, y: (points[4].y + points[8].y) / 2 }, source, view);
       const world = (result.worldLandmarks[index] ?? points) as Point[];
-      return { points, world, sx: wrist.x, pinchAt } as FrameHand;
+      // Centro da palma: não se move quando a pinça fecha, ao contrário do ponto entre polegar e indicador.
+      const palm = [0, 5, 9, 13, 17].reduce((sum, i) => ({ x: sum.x + points[i].x / 5, y: sum.y + points[i].y / 5 }), { x: 0, y: 0 });
+      return { points, world, sx: wrist.x, pinchAt, anchor: frameToScreen(palm, source, view) } as FrameHand;
     });
     setHandsDetected((previous) => previous === hands.length ? previous : hands.length);
 
@@ -490,8 +494,8 @@ function App() {
       const meter = Math.round(Math.max(0, Math.min(1, 1 - ratio / 0.9)) * 20) * 5;
       setPinch((previous) => previous === meter ? previous : meter);
 
-      const x = player.pinchAt.x;
-      const v = 1 - player.pinchAt.y;
+      const x = anchorXRef.current.update(player.anchor.x);
+      const v = 1 - anchorYRef.current.update(player.anchor.y);
       if (currentMode === "chords") synthRef.current.setBrightness(chordHeight ? x : v);
       if (chordHeight) {
         const index = chordZoneRef.current.update(v, vMin, vMax);
@@ -505,6 +509,8 @@ function App() {
     } else {
       pinchDetectorRef.current.reset();
       pinchEmaRef.current.reset();
+      anchorXRef.current.reset();
+      anchorYRef.current.reset();
       missingRef.current++;
     }
 
@@ -546,7 +552,7 @@ function App() {
       return {
         points: hand.points, role,
         badge: role === "select" ? selectorBadge : undefined,
-        pinchActive: role === "play" && held, pinchAt: hand.pinchAt,
+        pinchActive: role === "play" && held, pinchAt: hand.pinchAt, anchor: hand.anchor,
         color: role === "play" && playColor ? playColor : ROLE_COLORS[role]
       };
     });
